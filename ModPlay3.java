@@ -22,6 +22,7 @@ public class ModPlay3
 	private int[] sampleLoopStart = new int[ NUM_SAMPLES ];
 	private int[] sampleLoopLength = new int[ NUM_SAMPLES ];
 	private int[] channelInstrument = new int[ MAX_CHANNELS ];
+	private int[] channelAssignInst = new int[ MAX_CHANNELS ];
 	private int[] channelVolume = new int[ MAX_CHANNELS ];
 	private int[] channelPanning = new int[ MAX_CHANNELS ];
 	private int[] channelPeriod = new int[ MAX_CHANNELS ];
@@ -42,12 +43,12 @@ public class ModPlay3
 	public ModPlay3( int sampleRate, java.io.InputStream moduleData ) throws java.io.IOException
 	{
 		this.sampleRate = sampleRate;
-		songName = readString( moduleData, 20 ).trim();
+		songName = readString( moduleData, 20 );
 System.out.println(songName);
 		int[] sampleLengths = new int[ NUM_SAMPLES ];
 		for( int idx = 0; idx < NUM_SAMPLES; idx++ )
 		{
-			instrumentNames[ idx ] = readString( moduleData, 22 ).trim();
+			instrumentNames[ idx ] = readString( moduleData, 22 );
 			sampleLengths[ idx ] = ( ( ( moduleData.read() & 0xFF ) << 8 ) | ( moduleData.read() & 0xFF ) ) * 2;
 			sampleFineTune[ idx ] = ( byte ) ( moduleData.read() & 0xF );
 			sampleVolume[ idx ] = ( byte ) ( moduleData.read() & 0x7F );
@@ -132,7 +133,14 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 	
 	private void row()
 	{
-		currentSequencePos = nextSequencePos;
+		if( nextSequencePos < songLength )
+		{
+			currentSequencePos = nextSequencePos;
+		}
+		else
+		{
+			currentSequencePos = nextSequencePos = 0;
+		}
 		currentRow = nextRow;
 		currentTick = ticksPerRow;
 		nextRow = currentRow + 1;
@@ -140,10 +148,15 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 		{
 			nextRow = 0;
 			nextSequencePos = currentSequencePos + 1;
-			if( nextSequencePos >= songLength )
-			{
-				nextSequencePos = 0;
-			}
+		}
+		for( int chn = 0; chn < numChannels; chn++ )
+		{
+			int rowOffset = sequence[ currentSequencePos ] * 64 + currentRow;
+			int patternDataOffset = ( rowOffset * numChannels + chn ) * 4;
+			int period = ( ( patternData[ patternDataOffset ] & 0xF ) << 8 ) | ( patternData[ patternDataOffset + 1 ] & 0xFF );
+			int instrument = ( patternData[ patternDataOffset ] & 0x10 ) | ( ( patternData[ patternDataOffset + 2 ] & 0xF0 ) >> 4 );
+			int effect = patternData[ patternDataOffset + 2 ] & 0xF;
+			int parameter = patternData[ patternDataOffset + 3 ] & 0xFF;
 		}
 	}
 	
@@ -174,7 +187,20 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 	
 	private static String readString( java.io.InputStream inputStream, int length ) throws java.io.IOException
 	{
-		return new String( readBytes( inputStream, length ), "ISO-8859-1" );
+		byte[] bytes = readBytes( inputStream, length );
+		length = 0;
+		for( int idx = 0; idx < bytes.length; idx++ )
+		{
+			if( ( bytes[ idx ] & 0xFF ) <= 32 )
+			{
+				bytes[ idx ] = 32;
+			}
+			else
+			{
+				length = idx + 1;
+			}
+		}
+		return new String( bytes, 0, length, "ISO-8859-1" );
 	}
 	
 	public static void main( String[] args ) throws java.io.IOException {
