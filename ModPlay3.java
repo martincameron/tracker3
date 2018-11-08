@@ -97,9 +97,9 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 	{
 		if( tickSamplePos++ >= tickSampleLen )
 		{
+			tick();
 			tickSamplePos = 0;
 			tickSampleLen = ( sampleRate * 5 ) / ( tempo * 2 );
-			tick();
 		}
 		for( int idx = 0, end = count * 2; idx < end; idx += 2 )
 		{
