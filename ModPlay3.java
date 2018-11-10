@@ -1,10 +1,16 @@
 
 public class ModPlay3
 {
-	private static final int NUM_SAMPLES = 31;
+	private static final int NUM_SAMPLES = 32;
 	private static final int MAX_CHANNELS = 16;
 	private static final int FIXED_POINT_SHIFT = 13;
 	private static final int FIXED_POINT_ONE = 1 << FIXED_POINT_SHIFT;
+	
+	private static final short[] FINE_TUNE =
+	{
+		8192, 8251, 8311, 8371, 8432, 8493, 8555, 8617,
+		7732, 7788, 7845, 7902, 7959, 8016, 8075, 8133
+	};
 	
 	private int sampleRate;
 	
@@ -46,7 +52,7 @@ public class ModPlay3
 		songName = readString( moduleData, 20 );
 System.out.println(songName);
 		int[] sampleLengths = new int[ NUM_SAMPLES ];
-		for( int idx = 0; idx < NUM_SAMPLES; idx++ )
+		for( int idx = 1; idx < NUM_SAMPLES; idx++ )
 		{
 			instrumentNames[ idx ] = readString( moduleData, 22 );
 			sampleLengths[ idx ] = ( ( ( moduleData.read() & 0xFF ) << 8 ) | ( moduleData.read() & 0xFF ) ) * 2;
@@ -54,7 +60,7 @@ System.out.println(songName);
 			sampleVolume[ idx ] = ( byte ) ( moduleData.read() & 0x7F );
 			int loopStart = ( ( ( moduleData.read() & 0xFF ) << 8 ) | ( moduleData.read() & 0xFF ) ) * 2;
 			int loopLength = ( ( ( moduleData.read() & 0xFF ) << 8 ) | ( moduleData.read() & 0xFF ) ) * 2;
-			if( loopLength < 2 || loopStart > sampleLengths[ idx ] )
+			if( loopLength < 4 || loopStart > sampleLengths[ idx ] )
 			{
 				loopStart = sampleLengths[ idx ];
 			}
@@ -87,22 +93,27 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 			throw new IllegalArgumentException( "Module not recognised!" );
 		}
 		patternData = readBytes( moduleData, numChannels * 4 * 64 * numPatterns );
-		for( int idx = 0; idx < NUM_SAMPLES; idx++ )
+		for( int idx = 1; idx < NUM_SAMPLES; idx++ )
 		{
 			sampleData[ idx ] = readBytes( moduleData, sampleLengths[ idx ] );
+		}
+		for( int chn = 0; chn < MAX_CHANNELS; chn += 4 )
+		{
+			channelPanning[ chn ] = channelPanning[ chn + 3 ] = FIXED_POINT_ONE / 4 * 3;
+			channelPanning[ chn + 1 ] = channelPanning[ chn + 2 ] = FIXED_POINT_ONE / 4;
 		}
 	}
 	
 	public void getAudio( int[] output, int count )
 	{
-		if( tickSamplePos++ >= tickSampleLen )
-		{
-			tick();
-			tickSamplePos = 0;
-			tickSampleLen = ( sampleRate * 5 ) / ( tempo * 2 );
-		}
 		for( int idx = 0, end = count * 2; idx < end; idx += 2 )
 		{
+			if( tickSamplePos++ >= tickSampleLen )
+			{
+				tick();
+				tickSamplePos = 0;
+				tickSampleLen = ( sampleRate * 5 ) / ( tempo * 2 );
+			}
 			int lamp = 0, ramp = 0;
 			for( int chn = 0; chn < numChannels; chn++ )
 			{
@@ -142,7 +153,7 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 			currentSequencePos = nextSequencePos = 0;
 		}
 		currentRow = nextRow;
-		currentTick = ticksPerRow;
+		currentTick = ticksPerRow - 1;
 		nextRow = currentRow + 1;
 		if( nextRow > 63 )
 		{
@@ -157,6 +168,27 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 			int instrument = ( patternData[ patternDataOffset ] & 0x10 ) | ( ( patternData[ patternDataOffset + 2 ] & 0xF0 ) >> 4 );
 			int effect = patternData[ patternDataOffset + 2 ] & 0xF;
 			int parameter = patternData[ patternDataOffset + 3 ] & 0xFF;
+			if( instrument > 0 )
+			{
+				channelAssignInst[ chn ] = instrument;
+				channelVolume[ chn ] = sampleVolume[ instrument ];
+			}
+			if( period > 0 )
+			{
+				channelInstrument[ chn ] = channelAssignInst[ chn ];
+				channelPeriod[ chn ] = period;
+				channelSamplePos[ chn ] = 0;
+			}
+			switch( effect )
+			{
+				case 0xC: /* Set Volume. */
+					channelVolume[ chn ] = parameter;
+					break;
+			}
+			if( channelVolume[ chn ] > 64 )
+			{
+				channelVolume[ chn ] = 64;
+			}
 		}
 	}
 	
@@ -168,7 +200,15 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 		}
 		for( int chn = 0; chn < numChannels; chn++ ) 
 		{
-			channelStep[ chn ] = ( c2Rate * 428 / channelPeriod[ chn ] ) * FIXED_POINT_ONE / sampleRate;
+			int period = channelPeriod[ chn ];
+			if( period < 28 )
+			{
+				period = 28;
+			}
+			int frequency = c2Rate * 428 / period;
+			int fineTune = sampleFineTune[ channelInstrument[ chn ] ];
+			frequency = ( frequency * FINE_TUNE[ fineTune ] ) >> FIXED_POINT_SHIFT;
+			channelStep[ chn ] = frequency * FIXED_POINT_ONE / sampleRate;
 		}
 	}
 	
@@ -203,15 +243,45 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 		return new String( bytes, 0, length, "ISO-8859-1" );
 	}
 	
-	public static void main( String[] args ) throws java.io.IOException {
+	public static void main( String[] args ) throws Exception {
+		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, ( idx - 8 ) / 96.0 ) * FIXED_POINT_ONE ) );
+		ModPlay3 modPlay3;
 		java.io.InputStream inputStream = new java.io.FileInputStream( args[ 0 ] );
 		try
 		{
-			ModPlay3 modPlay3 = new ModPlay3( 48000, inputStream );
+			modPlay3 = new ModPlay3( 48000, inputStream );
 		}
 		finally
 		{
 			inputStream.close();
 		}
+		javax.sound.sampled.AudioFormat audioFormat = new javax.sound.sampled.AudioFormat( 48000, 16, 2, true, false );
+		javax.sound.sampled.SourceDataLine sourceDataLine = ( javax.sound.sampled.SourceDataLine )
+			javax.sound.sampled.AudioSystem.getLine( new javax.sound.sampled.DataLine.Info(
+				javax.sound.sampled.SourceDataLine.class, audioFormat ) );
+		sourceDataLine.open( audioFormat );
+		sourceDataLine.start();
+		int[] mixBuf = new int[ 4096 ];
+		byte[] outBuf = new byte[ mixBuf.length * 2 ];
+		while( true )
+		{
+			modPlay3.getAudio( mixBuf, mixBuf.length / 2 );
+			for( int idx = 0; idx < mixBuf.length; idx++ )
+			{
+				int ampl = mixBuf[ idx ];
+				if( ampl > 32767 )
+				{
+					ampl = 32767;
+				}
+				if( ampl < -32768 )
+				{
+					ampl = -32768;
+				}
+				outBuf[ idx * 2 ] = ( byte ) ampl;
+				outBuf[ idx * 2 + 1 ] = ( byte ) ( ampl >> 8 );
+			}
+			sourceDataLine.write( outBuf, 0, outBuf.length );
+		}
 	}
 }
+
