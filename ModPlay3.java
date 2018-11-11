@@ -12,6 +12,12 @@ public class ModPlay3
 		7732, 7788, 7845, 7902, 7959, 8016, 8075, 8133
 	};
 	
+	private static final short[] ARPEGGIO =
+	{
+		8192, 7732, 7298, 6889, 6502, 6137, 5793, 5468,
+		5161, 4871, 4598, 4340, 4096, 3866, 3649, 3444
+	};
+	
 	private int sampleRate;
 	
 	private String songName;
@@ -28,12 +34,15 @@ public class ModPlay3
 	private int[] sampleLoopStart = new int[ NUM_SAMPLES ];
 	private int[] sampleLoopLength = new int[ NUM_SAMPLES ];
 	private int[] channelInstrument = new int[ MAX_CHANNELS ];
-	private int[] channelAssignInst = new int[ MAX_CHANNELS ];
+	private int[] channelAssigned = new int[ MAX_CHANNELS ];
+	private int[] channelEffect = new int[ MAX_CHANNELS ];
+	private int[] channelParameter = new int[ MAX_CHANNELS ];
 	private int[] channelVolume = new int[ MAX_CHANNELS ];
 	private int[] channelPanning = new int[ MAX_CHANNELS ];
 	private int[] channelPeriod = new int[ MAX_CHANNELS ];
 	private int[] channelSamplePos = new int[ MAX_CHANNELS ];
 	private int[] channelStep = new int[ MAX_CHANNELS ];
+	private int[] channelArpeggio = new int[ MAX_CHANNELS ];
 	
 	private int tickSamplePos;
 	private int tickSampleLen;
@@ -45,6 +54,8 @@ public class ModPlay3
 	private int currentTick;
 	private int ticksPerRow = 6;
 	private int tempo = 125;
+	
+	private int effectCounter;
 	
 	public ModPlay3( int sampleRate, java.io.InputStream moduleData ) throws java.io.IOException
 	{
@@ -153,7 +164,7 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 			currentSequencePos = nextSequencePos = 0;
 		}
 		currentRow = nextRow;
-		currentTick = ticksPerRow - 1;
+		currentTick = ticksPerRow;
 		nextRow = currentRow + 1;
 		if( nextRow > 63 )
 		{
@@ -168,47 +179,101 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 			int instrument = ( patternData[ patternDataOffset ] & 0x10 ) | ( ( patternData[ patternDataOffset + 2 ] & 0xF0 ) >> 4 );
 			int effect = patternData[ patternDataOffset + 2 ] & 0xF;
 			int parameter = patternData[ patternDataOffset + 3 ] & 0xFF;
+			if( effect == 0xE )
+			{
+				effect = 0xE0 | ( ( parameter >> 4 ) & 0xF );
+				parameter = parameter & 0xF;
+			}
 			if( instrument > 0 )
 			{
-				channelAssignInst[ chn ] = instrument;
+				channelAssigned[ chn ] = instrument;
 				channelVolume[ chn ] = sampleVolume[ instrument ];
 			}
 			if( period > 0 )
 			{
-				channelInstrument[ chn ] = channelAssignInst[ chn ];
+				channelInstrument[ chn ] = channelAssigned[ chn ];
 				channelPeriod[ chn ] = period;
 				channelSamplePos[ chn ] = 0;
 			}
+			channelEffect[ chn ] = effect;
+			channelParameter[ chn ] = parameter;
 			switch( effect )
 			{
+				case 0x0: /* Arpeggio. */
+					break;
 				case 0xC: /* Set Volume. */
 					channelVolume[ chn ] = parameter;
 					break;
-			}
-			if( channelVolume[ chn ] > 64 )
-			{
-				channelVolume[ chn ] = 64;
+				case 0xF: /* Set speed/tempo.*/
+					if( channelParameter[ chn ] < 32 )
+					{
+						currentTick = ticksPerRow = channelParameter[ chn ];
+					}
+					else
+					{
+						tempo = channelParameter[ chn ];
+					}
+					break;
+				default:
+					throw new UnsupportedOperationException( "Unsupported effect 0x"
+						+ ( Integer.toHexString( channelEffect[ chn ] )
+						+ " " + Integer.toHexString( channelParameter[ chn ] ) ).toUpperCase() );
 			}
 		}
 	}
 	
 	private void tick()
 	{
-		if( currentTick-- <= 0 )
+		if( --currentTick <= 0 )
 		{
 			row();
+			effectCounter = 0;
+		}
+		else
+		{
+			effectCounter++;
+			for( int chn = 0; chn < numChannels; chn++ ) 
+			{
+				channelArpeggio[ chn ] = 0;
+				switch( channelEffect[ chn ] )
+				{
+					case 0x0: /* Arpeggio. */
+						if( channelParameter[ chn ] > 0 )
+						{
+							switch( effectCounter % 3 )
+							{
+								case 1:
+									channelArpeggio[ chn ] = ( channelParameter[ chn ] >> 4 ) & 0xF;
+									break;
+								case 2:
+									channelArpeggio[ chn ] = channelParameter[ chn ] & 0xF;
+									break;
+							}
+						}
+						break;
+				}
+			}
 		}
 		for( int chn = 0; chn < numChannels; chn++ ) 
 		{
-			int period = channelPeriod[ chn ];
-			if( period < 28 )
+			/* Calculate volume and frequency. */
+			if( channelVolume[ chn ] > 64 )
 			{
-				period = 28;
+				channelVolume[ chn ] = 64;
 			}
-			int frequency = c2Rate * 428 / period;
-			int fineTune = sampleFineTune[ channelInstrument[ chn ] ];
-			frequency = ( frequency * FINE_TUNE[ fineTune ] ) >> FIXED_POINT_SHIFT;
-			channelStep[ chn ] = frequency * FIXED_POINT_ONE / sampleRate;
+			int period = channelPeriod[ chn ];
+			if( period > 0 )
+			{
+				period = ( period * ARPEGGIO[ channelArpeggio[ chn ] ] ) >> FIXED_POINT_SHIFT;
+				if( period < 28 )
+				{
+					period = 28;
+				}
+				int frequency = c2Rate * 428 / period;
+				int fineTune = sampleFineTune[ channelInstrument[ chn ] ];
+				frequency = ( frequency * FINE_TUNE[ fineTune ] ) >> FIXED_POINT_SHIFT;
+				channelStep[ chn ] = frequency * FIXED_POINT_ONE / sampleRate;
+			}
 		}
 	}
 	
@@ -245,6 +310,7 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 	
 	public static void main( String[] args ) throws Exception {
 		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, ( idx - 8 ) / 96.0 ) * FIXED_POINT_ONE ) );
+		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, idx / -12.0 ) * FIXED_POINT_ONE ) );
 		ModPlay3 modPlay3;
 		java.io.InputStream inputStream = new java.io.FileInputStream( args[ 0 ] );
 		try
@@ -284,4 +350,3 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 		}
 	}
 }
-
