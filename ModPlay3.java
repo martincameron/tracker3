@@ -18,8 +18,13 @@ public class ModPlay3
 		5161, 4871, 4598, 4340, 4096, 3866, 3649, 3444
 	};
 	
-	private int sampleRate;
+	private static final short[] VIBRATO =
+	{
+		0,    24,  49,  74, 97, 120, 141, 161, 180, 197, 212, 224, 235, 244, 250, 253,
+		255, 253, 250, 244,235, 224, 212, 197, 180, 161, 141, 120,  97,  74,  49,  24
+	};
 	
+	private int sampleRate;
 	private String songName;
 	private String[] instrumentNames = new String[ NUM_SAMPLES ];
 	private int numChannels;
@@ -43,10 +48,11 @@ public class ModPlay3
 	private int[] channelSamplePos = new int[ MAX_CHANNELS ];
 	private int[] channelStep = new int[ MAX_CHANNELS ];
 	private int[] channelArpeggio = new int[ MAX_CHANNELS ];
-	
-	private int tickSamplePos;
-	private int tickSampleLen;
-	
+	private int[] channelVibrato = new int[ MAX_CHANNELS ];
+	private int[] channelVibratoParam = new int[ MAX_CHANNELS ];
+	private int[] channelVibratoPhase = new int[ MAX_CHANNELS ];
+	private int[] channelPortaPeriod = new int[ MAX_CHANNELS ];
+	private int[] channelPortaSpeed = new int[ MAX_CHANNELS ];
 	private int currentSequencePos;
 	private int nextSequencePos;
 	private int currentRow;
@@ -54,8 +60,9 @@ public class ModPlay3
 	private int currentTick;
 	private int ticksPerRow = 6;
 	private int tempo = 125;
-	
 	private int effectCounter;
+	private int tickSamplePos;
+	private int tickSampleLen;
 	
 	public ModPlay3( int sampleRate, java.io.InputStream moduleData ) throws java.io.IOException
 	{
@@ -191,15 +198,40 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 			}
 			if( period > 0 )
 			{
-				channelInstrument[ chn ] = channelAssigned[ chn ];
-				channelPeriod[ chn ] = period;
-				channelSamplePos[ chn ] = 0;
+				if( effect == 0x3 || effect == 0x5 )
+				{
+					channelPortaPeriod[ chn ] = period;
+				}
+				else
+				{
+					channelInstrument[ chn ] = channelAssigned[ chn ];
+					channelPeriod[ chn ] = period;
+					channelSamplePos[ chn ] = 0;
+					channelVibratoPhase[ chn ] = 0;
+				}
 			}
 			channelEffect[ chn ] = effect;
 			channelParameter[ chn ] = parameter;
+			channelArpeggio[ chn ] = 0;
+			channelVibrato[ chn ] = 0;
 			switch( effect )
 			{
 				case 0x0: /* Arpeggio. */
+				case 0x1: /* Portamento up. */
+				case 0x2: /* Portamento down. */
+					break;
+				case 0x3: /* Tone portamento. */
+					if( parameter > 0 )
+					{
+						channelPortaSpeed[ chn ] = parameter;
+					}
+					break;
+				case 0x4: /* Vibrato. */
+					if( parameter > 0 )
+					{
+						channelVibratoParam[ chn ] = parameter;
+					}
+					vibrato( chn );
 					break;
 				case 0xC: /* Set Volume. */
 					channelVolume[ chn ] = parameter;
@@ -234,7 +266,6 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 			effectCounter++;
 			for( int chn = 0; chn < numChannels; chn++ ) 
 			{
-				channelArpeggio[ chn ] = 0;
 				switch( channelEffect[ chn ] )
 				{
 					case 0x0: /* Arpeggio. */
@@ -242,6 +273,9 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 						{
 							switch( effectCounter % 3 )
 							{
+								default:
+									channelArpeggio[ chn ] = 0;
+									break;
 								case 1:
 									channelArpeggio[ chn ] = ( channelParameter[ chn ] >> 4 ) & 0xF;
 									break;
@@ -250,6 +284,18 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 									break;
 							}
 						}
+						break;
+					case 0x1: /* Portamento up. */
+						channelPeriod[ chn ] -= channelParameter[ chn ];
+						break;
+					case 0x2: /* Portamento down. */
+						channelPeriod[ chn ] += channelParameter[ chn ];
+						break;
+					case 0x3: /* Tone portamento. */
+						tonePortamento( chn );
+						break;
+					case 0x4: /* Vibrato. */
+						vibrato( chn );
 						break;
 				}
 			}
@@ -264,6 +310,7 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 			int period = channelPeriod[ chn ];
 			if( period > 0 )
 			{
+				period = period + channelVibrato[ chn ];
 				period = ( period * ARPEGGIO[ channelArpeggio[ chn ] ] ) >> FIXED_POINT_SHIFT;
 				if( period < 28 )
 				{
@@ -275,6 +322,39 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 				channelStep[ chn ] = frequency * FIXED_POINT_ONE / sampleRate;
 			}
 		}
+	}
+	
+	private void tonePortamento( int chn )
+	{
+		if( channelPeriod[ chn ] < channelPortaPeriod[ chn ] )
+		{
+			channelPeriod[ chn ] += channelPortaSpeed[ chn ];
+			if( channelPeriod[ chn ] > channelPortaPeriod[ chn ] )
+			{
+				channelPeriod[ chn ] = channelPortaPeriod[ chn ];
+			}
+		}
+		else
+		{
+			channelPeriod[ chn ] -= channelPortaSpeed[ chn ];
+			if( channelPeriod[ chn ] < channelPortaPeriod[ chn ] )
+			{
+				channelPeriod[ chn ] = channelPortaPeriod[ chn ];
+			}
+		}
+	}
+	
+	private void vibrato( int chn )
+	{
+		int speed = ( channelVibratoParam[ chn ] >> 4 ) & 0xF;
+		int depth = channelVibratoParam[ chn ] & 0xF;
+		int phase = channelVibratoPhase[ chn ] & 0x3F;
+		channelVibrato[ chn ] = ( VIBRATO[ phase & 0x1F ] * depth ) >> 7;
+		if( phase > 0x1F )
+		{
+			channelVibrato[ chn ] = -channelVibrato[ chn ];
+		}
+		channelVibratoPhase[ chn ] += speed;
 	}
 	
 	private static byte[] readBytes( java.io.InputStream inputStream, int length ) throws java.io.IOException
