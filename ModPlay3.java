@@ -34,8 +34,8 @@ public class ModPlay3
 	private byte[] sequence;
 	private byte[] patternData;
 	private byte[][] sampleData = new byte[ NUM_SAMPLES ][];
-	private byte[] sampleFineTune = new byte[ NUM_SAMPLES ];
-	private byte[] sampleVolume = new byte[ NUM_SAMPLES ];
+	private int[] sampleFineTune = new int[ NUM_SAMPLES ];
+	private int[] sampleVolume = new int[ NUM_SAMPLES ];
 	private int[] sampleLoopStart = new int[ NUM_SAMPLES ];
 	private int[] sampleLoopLength = new int[ NUM_SAMPLES ];
 	private int[] channelInstrument = new int[ MAX_CHANNELS ];
@@ -53,6 +53,8 @@ public class ModPlay3
 	private int[] channelVibratoPhase = new int[ MAX_CHANNELS ];
 	private int[] channelPortaPeriod = new int[ MAX_CHANNELS ];
 	private int[] channelPortaSpeed = new int[ MAX_CHANNELS ];
+	private int[] channelTremolo = new int[ MAX_CHANNELS ];
+	private int[] channelTremoloParam = new int[ MAX_CHANNELS ];
 	private int currentSequencePos;
 	private int nextSequencePos;
 	private int currentRow;
@@ -74,8 +76,8 @@ System.out.println(songName);
 		{
 			instrumentNames[ idx ] = readString( moduleData, 22 );
 			sampleLengths[ idx ] = ( ( ( moduleData.read() & 0xFF ) << 8 ) | ( moduleData.read() & 0xFF ) ) * 2;
-			sampleFineTune[ idx ] = ( byte ) ( moduleData.read() & 0xF );
-			sampleVolume[ idx ] = ( byte ) ( moduleData.read() & 0x7F );
+			sampleFineTune[ idx ] = moduleData.read() & 0xF;
+			sampleVolume[ idx ] = moduleData.read() & 0x7F;
 			int loopStart = ( ( ( moduleData.read() & 0xFF ) << 8 ) | ( moduleData.read() & 0xFF ) ) * 2;
 			int loopLength = ( ( ( moduleData.read() & 0xFF ) << 8 ) | ( moduleData.read() & 0xFF ) ) * 2;
 			if( loopLength < 4 || loopStart > sampleLengths[ idx ] )
@@ -170,7 +172,14 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 		{
 			currentSequencePos = nextSequencePos = 0;
 		}
-		currentRow = nextRow;
+		if( nextRow < 64 )
+		{
+			currentRow = nextRow;
+		}
+		else
+		{
+			currentRow = 0;
+		}
 		currentTick = ticksPerRow;
 		nextRow = currentRow + 1;
 		if( nextRow > 63 )
@@ -198,11 +207,8 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 			}
 			if( period > 0 )
 			{
-				if( effect == 0x3 || effect == 0x5 )
-				{
-					channelPortaPeriod[ chn ] = period;
-				}
-				else
+				channelPortaPeriod[ chn ] = period;
+				if( effect != 0x3 && effect != 0x5 && effect != 0xED )
 				{
 					channelInstrument[ chn ] = channelAssigned[ chn ];
 					channelPeriod[ chn ] = period;
@@ -214,6 +220,7 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 			channelParameter[ chn ] = parameter;
 			channelArpeggio[ chn ] = 0;
 			channelVibrato[ chn ] = 0;
+			channelTremolo[ chn ] = 0;
 			switch( effect )
 			{
 				case 0x0: /* Arpeggio. */
@@ -233,8 +240,48 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 					}
 					vibrato( chn );
 					break;
-				case 0xC: /* Set Volume. */
+				case 0x5: /* Tone porta + Volume slide. */
+					break;
+				case 0x6: /* Vibrato + Volume slide. */
+					vibrato( chn );
+					break;
+				case 0x7: /* Tremolo. */
+					if( parameter > 0 )
+					{
+						channelTremoloParam[ chn ] = parameter;
+					}
+					tremolo( chn );
+					break;
+				case 0x8: /* Set panning. */
+					if( numChannels > 4 )
+					{
+						if( parameter > 128 )
+						{
+							channelPanning[ chn ] = FIXED_POINT_ONE / 2;
+						}
+						else
+						{
+							channelPanning[ chn ] = parameter * FIXED_POINT_ONE / 128;
+						}
+					}
+					break;
+				case 0x9: /* Set sample offset. */
+					channelSamplePos[ chn ] = parameter * 256 * FIXED_POINT_ONE;
+					break;
+				case 0xA: /* Volume slide. */
+					break;
+				case 0xB: /* Pattern jump. */
+					nextSequencePos = parameter;
+					nextRow = 0;
+					break;
+				case 0xC: /* Set volume. */
 					channelVolume[ chn ] = parameter;
+					break;
+				case 0xD: /* Pattern break. */
+					nextSequencePos = currentSequencePos + 1;
+					nextRow = ( parameter >> 4 ) * 10 + ( parameter & 0xF );
+					break;
+				case 0xE: /* Remapped to 0xEx. */
 					break;
 				case 0xF: /* Set speed/tempo.*/
 					if( channelParameter[ chn ] < 32 )
@@ -245,6 +292,39 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 					{
 						tempo = channelParameter[ chn ];
 					}
+					break;
+				case 0xE0: /* Set filter.*/
+					break;
+				case 0xE1: /* Fine portamento up. */
+					channelPeriod[ chn ] -= parameter;
+					break;
+				case 0xE2: /* Fine portamento down. */
+					channelPeriod[ chn ] += parameter;
+					break;
+				case 0xE3: /* Glissando.*/
+				case 0xE4: /* Set vibrato waveform.*/
+					break;
+				case 0xE5: /* Set finetune.*/
+					sampleFineTune[ instrument ] = parameter;
+					break;
+				case 0xE6: /* Pattern loop. */
+				case 0xE7: /* Set tremolo waveform. */
+				case 0xE8: /* Panning. */
+				case 0xE9: /* Retrig. */
+					break;
+				case 0xEA: /* Fine volume slide up. */
+					channelVolume[ chn ] += parameter;
+					break;
+				case 0xEB: /* Fine volume slide down. */
+					channelVolume[ chn ] -= parameter;
+					break;
+				case 0xEC: /* Note cut. */
+				case 0xED: /* Note delay. */
+					break;
+				case 0xEE: /* Pattern delay. */
+					currentTick += ticksPerRow * parameter;
+					break;
+				case 0xEF: /* Invert loop. */
 					break;
 				default:
 					throw new UnsupportedOperationException( "Unsupported effect 0x"
@@ -297,15 +377,64 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 					case 0x4: /* Vibrato. */
 						vibrato( chn );
 						break;
+					case 0x5: /* Tone porta + Volume slide. */
+						tonePortamento( chn );
+						volumeSlide( chn );
+						break;
+					case 0x6: /* Vibrato + Volume slide. */
+						vibrato( chn );
+						volumeSlide( chn );
+						break;
+					case 0x7: /* Tremolo. */
+						tremolo( chn );
+						break;
+					case 0xA: /* Volume slide. */
+						volumeSlide( chn );
+						break;
+					case 0xE9: /* Retrig. */
+						if( effectCounter % channelParameter[ chn ] == 0 )
+						{
+							channelSamplePos[ chn ] = 0;
+						}
+						break;
+					case 0xEC: /* Note cut. */
+						if( effectCounter == channelParameter[ chn ] )
+						{
+							channelVolume[ chn ] = 0;
+						}
+						break;
+					case 0xED: /* Note delay. */
+						if( effectCounter == channelParameter[ chn ] )
+						{
+							channelInstrument[ chn ] = channelAssigned[ chn ];
+							channelPeriod[ chn ] = channelPortaPeriod[ chn ];
+							channelSamplePos[ chn ] = 0;
+							channelVibratoPhase[ chn ] = 0;
+						}
+						break;
 				}
 			}
 		}
 		for( int chn = 0; chn < numChannels; chn++ ) 
 		{
 			/* Calculate volume and frequency. */
-			if( channelVolume[ chn ] > 64 )
+			int volume = channelVolume[ chn ];
+			if( volume > 64 )
 			{
-				channelVolume[ chn ] = 64;
+				volume = channelVolume[ chn ] = 64;
+			}
+			else if( volume < 0 )
+			{
+				volume = channelVolume[ chn ] = 0;
+			}
+			volume = volume + channelTremolo[ chn ];
+			if( volume > 64 )
+			{
+				volume = 64;
+			}
+			else if( volume < 0 )
+			{
+				volume = 0;
 			}
 			int period = channelPeriod[ chn ];
 			if( period > 0 )
@@ -353,6 +482,26 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 		if( phase > 0x1F )
 		{
 			channelVibrato[ chn ] = -channelVibrato[ chn ];
+		}
+		channelVibratoPhase[ chn ] += speed;
+	}
+	
+	private void volumeSlide( int chn )
+	{
+		int up = ( channelParameter[ chn ] >> 4 ) & 0xF;
+		int down = channelParameter[ chn ] & 0xF;
+		channelVolume[ chn ] += up - down;
+	}
+	
+	private void tremolo( int chn )
+	{
+		int speed = ( channelTremoloParam[ chn ] >> 4 ) & 0xF;
+		int depth = channelTremoloParam[ chn ] & 0xF;
+		int phase = channelVibratoPhase[ chn ] & 0x3F;
+		channelTremolo[ chn ] = ( VIBRATO[ phase & 0x1F ] * depth ) >> 6;
+		if( phase > 0x1F )
+		{
+			channelTremolo[ chn ] = -channelTremolo[ chn ];
 		}
 		channelVibratoPhase[ chn ] += speed;
 	}
