@@ -6,6 +6,11 @@ public class ModPlay3
 	private static final int FIXED_POINT_SHIFT = 13;
 	private static final int FIXED_POINT_ONE = 1 << FIXED_POINT_SHIFT;
 	
+	private static final int[] FILTER_COEFFS =
+	{
+		1069, 2841, 4351, 4351, 2841, 1069
+	};
+	
 	private static final short[] FINE_TUNE =
 	{
 		8192, 8251, 8311, 8371, 8432, 8493, 8555, 8617,
@@ -124,9 +129,9 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 		}
 	}
 	
-	public void getAudio( int[] output, int count )
+	public void getAudio( int[] output, int offset, int count )
 	{
-		for( int idx = 0, end = count * 2; idx < end; idx += 2 )
+		for( int idx = offset * 2, end = ( offset + count ) * 2; idx < end; idx += 2 )
 		{
 			if( tickSamplePos++ >= tickSampleLen )
 			{
@@ -204,6 +209,11 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 			{
 				channelAssigned[ chn ] = instrument;
 				channelVolume[ chn ] = sampleVolume[ instrument ];
+				if( channelSamplePos[ chn ] >= sampleLoopStart[ channelInstrument[ chn ] ]
+					&& sampleLoopLength[ channelInstrument[ chn ] ] > 0 )
+				{
+					channelInstrument[ chn ] = instrument;
+				}
 			}
 			if( period > 0 )
 			{
@@ -305,7 +315,7 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 				case 0xE4: /* Set vibrato waveform.*/
 					break;
 				case 0xE5: /* Set finetune.*/
-					sampleFineTune[ instrument ] = parameter;
+					sampleFineTune[ channelAssigned[ chn ] ] = parameter;
 					break;
 				case 0xE6: /* Pattern loop. */
 				case 0xE7: /* Set tremolo waveform. */
@@ -537,6 +547,22 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 		return new String( bytes, 0, length, "ISO-8859-1" );
 	}
 	
+	private static void downsample( int[] buf, int count )
+	{
+		for( int idx = 0; idx < count; idx++ )
+		{
+			int lamp = 0;
+			int ramp = 0;
+			for( int coef = 0; coef < FILTER_COEFFS.length; coef++ )
+			{
+				lamp += ( buf[ idx * 4 + coef * 2 ] * FILTER_COEFFS[ coef ] ) >> 14;
+				ramp += ( buf[ idx * 4 + coef * 2 + 1 ] * FILTER_COEFFS[ coef ] ) >> 14;
+			}
+			buf[ idx * 2 ] = lamp;
+			buf[ idx * 2 + 1 ] = ramp;
+		}
+	}
+	
 	public static void main( String[] args ) throws Exception {
 		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, ( idx - 8 ) / 96.0 ) * FIXED_POINT_ONE ) );
 		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, idx / -12.0 ) * FIXED_POINT_ONE ) );
@@ -544,7 +570,7 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 		java.io.InputStream inputStream = new java.io.FileInputStream( args[ 0 ] );
 		try
 		{
-			modPlay3 = new ModPlay3( 48000, inputStream );
+			modPlay3 = new ModPlay3( 96000, inputStream );
 		}
 		finally
 		{
@@ -556,12 +582,15 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 				javax.sound.sampled.SourceDataLine.class, audioFormat ) );
 		sourceDataLine.open( audioFormat );
 		sourceDataLine.start();
-		int[] mixBuf = new int[ 4096 ];
-		byte[] outBuf = new byte[ mixBuf.length * 2 ];
+		final int MIX_BUF_SAMPLES = 2048;
+		int[] mixBuf = new int[ ( MIX_BUF_SAMPLES + FILTER_COEFFS.length ) * 2 ];
+		byte[] outBuf = new byte[ MIX_BUF_SAMPLES * 2 ];
 		while( true )
 		{
-			modPlay3.getAudio( mixBuf, mixBuf.length / 2 );
-			for( int idx = 0; idx < mixBuf.length; idx++ )
+			System.arraycopy( mixBuf, MIX_BUF_SAMPLES * 2, mixBuf, 0, FILTER_COEFFS.length * 2 );
+			modPlay3.getAudio( mixBuf, FILTER_COEFFS.length, MIX_BUF_SAMPLES );
+			downsample( mixBuf, MIX_BUF_SAMPLES / 2 );
+			for( int idx = 0; idx < MIX_BUF_SAMPLES; idx++ )
 			{
 				int ampl = mixBuf[ idx ];
 				if( ampl > 32767 )
