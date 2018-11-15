@@ -8,7 +8,7 @@ public class ModPlay3
 	
 	private static final int[] FILTER_COEFFS =
 	{
-		1069, 2841, 4351, 4351, 2841, 1069
+		-512, 0, 4096, 8192, 4096, 0, -512
 	};
 	
 	private static final short[] FINE_TUNE =
@@ -555,8 +555,8 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 			int ramp = 0;
 			for( int coef = 0; coef < FILTER_COEFFS.length; coef++ )
 			{
-				lamp += ( buf[ idx * 4 + coef * 2 ] * FILTER_COEFFS[ coef ] ) >> 14;
-				ramp += ( buf[ idx * 4 + coef * 2 + 1 ] * FILTER_COEFFS[ coef ] ) >> 14;
+				lamp += ( buf[ idx * 4 + coef * 2 ] * FILTER_COEFFS[ coef ] ) >> FIXED_POINT_SHIFT;
+				ramp += ( buf[ idx * 4 + coef * 2 + 1 ] * FILTER_COEFFS[ coef ] ) >> FIXED_POINT_SHIFT;
 			}
 			buf[ idx * 2 ] = lamp;
 			buf[ idx * 2 + 1 ] = ramp;
