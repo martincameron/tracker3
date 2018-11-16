@@ -75,7 +75,6 @@ public class ModPlay3
 	{
 		this.sampleRate = sampleRate;
 		songName = readString( moduleData, 20 );
-System.out.println(songName);
 		int[] sampleLengths = new int[ NUM_SAMPLES ];
 		for( int idx = 1; idx < NUM_SAMPLES; idx++ )
 		{
@@ -95,7 +94,6 @@ System.out.println(songName);
 			}
 			sampleLoopStart[ idx ]  = loopStart * FIXED_POINT_ONE;
 			sampleLoopLength[ idx ]  = loopLength * FIXED_POINT_ONE;
-if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 		}
 		songLength = moduleData.read() & 0x7F;
 		int restart = moduleData.read() & 0x7F;
@@ -124,8 +122,8 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 		}
 		for( int chn = 0; chn < MAX_CHANNELS; chn += 4 )
 		{
-			channelPanning[ chn ] = channelPanning[ chn + 3 ] = FIXED_POINT_ONE / 4 * 3;
-			channelPanning[ chn + 1 ] = channelPanning[ chn + 2 ] = FIXED_POINT_ONE / 4;
+			channelPanning[ chn ] = channelPanning[ chn + 2 ] = FIXED_POINT_ONE / 4;
+			channelPanning[ chn + 1] = channelPanning[ chn + 3 ] = FIXED_POINT_ONE / 4 * 3;
 		}
 	}
 	
@@ -212,6 +210,15 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 				if( channelSamplePos[ chn ] >= sampleLoopStart[ channelInstrument[ chn ] ]
 					&& sampleLoopLength[ channelInstrument[ chn ] ] > 0 )
 				{
+					channelSamplePos[ chn ] -= sampleLoopStart[ channelInstrument[ chn ] ];
+					if( sampleLoopLength[ instrument ] > 0 )
+					{
+						channelSamplePos[ chn ] = sampleLoopStart[ instrument ] + channelSamplePos[ chn ] % sampleLoopLength[ instrument ];
+					}
+					else
+					{
+						channelSamplePos[ chn ] = sampleLoopStart[ instrument ];
+					}
 					channelInstrument[ chn ] = instrument;
 				}
 			}
@@ -563,6 +570,21 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 		}
 	}
 	
+	private static String pad( String string, int length, char chr )
+	{
+		if( string.length() < length )
+		{
+			char[] chars = new char[ length ];
+			for( int idx = 0; idx < chars.length; idx++ )
+			{
+				chars[ idx ] = chr;
+			}
+			string.getChars( 0, string.length(), chars, length - string.length() );
+			return new String( chars );
+		}
+		return string;
+	}
+	
 	public static void main( String[] args ) throws Exception {
 		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, ( idx - 8 ) / 96.0 ) * FIXED_POINT_ONE ) );
 		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, idx / -12.0 ) * FIXED_POINT_ONE ) );
@@ -575,6 +597,18 @@ if(instrumentNames[idx].length() > 0 )System.out.println(instrumentNames[idx]);
 		finally
 		{
 			inputStream.close();
+		}
+		System.out.println( "ModPlay3 (C)2018 Martin Cameron!" );
+		System.out.println( "Playing: " + modPlay3.songName );
+		for( int idx = 1; idx < NUM_SAMPLES; idx++ )
+		{
+			if( modPlay3.sampleData[ idx ].length > 0 || modPlay3.instrumentNames[ idx ].length() > 0 )
+			{
+				System.out.println( pad( String.valueOf( idx ), 2, '0' )
+					+ pad( modPlay3.instrumentNames[ idx ], 23, ' ' )
+					+ pad( String.valueOf( modPlay3.sampleLoopStart[ idx ] >> FIXED_POINT_SHIFT ), 7, ' ' )
+					+ pad( String.valueOf( modPlay3.sampleLoopLength[ idx ] >> FIXED_POINT_SHIFT ), 7, ' ' ) );
+			}
 		}
 		javax.sound.sampled.AudioFormat audioFormat = new javax.sound.sampled.AudioFormat( 48000, 16, 2, true, false );
 		javax.sound.sampled.SourceDataLine sourceDataLine = ( javax.sound.sampled.SourceDataLine )
