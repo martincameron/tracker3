@@ -54,12 +54,14 @@ public class ModPlay3
 	private int[] channelStep = new int[ MAX_CHANNELS ];
 	private int[] channelArpeggio = new int[ MAX_CHANNELS ];
 	private int[] channelVibrato = new int[ MAX_CHANNELS ];
-	private int[] channelVibratoParam = new int[ MAX_CHANNELS ];
+	private int[] channelVibratoSpeed = new int[ MAX_CHANNELS ];
+	private int[] channelVibratoDepth = new int[ MAX_CHANNELS ];
 	private int[] channelVibratoPhase = new int[ MAX_CHANNELS ];
 	private int[] channelPortaPeriod = new int[ MAX_CHANNELS ];
 	private int[] channelPortaSpeed = new int[ MAX_CHANNELS ];
 	private int[] channelTremolo = new int[ MAX_CHANNELS ];
-	private int[] channelTremoloParam = new int[ MAX_CHANNELS ];
+	private int[] channelTremoloSpeed = new int[ MAX_CHANNELS ];
+	private int[] channelTremoloDepth = new int[ MAX_CHANNELS ];
 	private int currentSequencePos;
 	private int nextSequencePos;
 	private int currentRow;
@@ -251,9 +253,13 @@ public class ModPlay3
 					}
 					break;
 				case 0x4: /* Vibrato. */
-					if( parameter > 0 )
+					if( ( parameter & 0xF0 ) > 0 )
 					{
-						channelVibratoParam[ chn ] = parameter;
+						channelVibratoSpeed[ chn ] = ( parameter & 0xF0 ) >> 4;
+					}
+					if( ( parameter & 0xF ) > 0 )
+					{
+						channelVibratoDepth[ chn ] = parameter & 0xF;
 					}
 					vibrato( chn );
 					break;
@@ -263,9 +269,13 @@ public class ModPlay3
 					vibrato( chn );
 					break;
 				case 0x7: /* Tremolo. */
-					if( parameter > 0 )
+					if( ( parameter & 0xF0 ) > 0 )
 					{
-						channelTremoloParam[ chn ] = parameter;
+						channelTremoloSpeed[ chn ] = ( parameter & 0xF0 ) >> 4;
+					}
+					if( ( parameter & 0xF ) > 0 )
+					{
+						channelTremoloDepth[ chn ] = parameter & 0xF;
 					}
 					tremolo( chn );
 					break;
@@ -492,15 +502,13 @@ public class ModPlay3
 	
 	private void vibrato( int chn )
 	{
-		int speed = ( channelVibratoParam[ chn ] >> 4 ) & 0xF;
-		int depth = channelVibratoParam[ chn ] & 0xF;
 		int phase = channelVibratoPhase[ chn ] & 0x3F;
-		channelVibrato[ chn ] = ( VIBRATO[ phase & 0x1F ] * depth ) >> 7;
+		channelVibrato[ chn ] = ( VIBRATO[ phase & 0x1F ] * channelVibratoDepth[ chn ] ) >> 7;
 		if( phase > 0x1F )
 		{
 			channelVibrato[ chn ] = -channelVibrato[ chn ];
 		}
-		channelVibratoPhase[ chn ] += speed;
+		channelVibratoPhase[ chn ] += channelVibratoSpeed[ chn ];
 	}
 	
 	private void volumeSlide( int chn )
@@ -512,15 +520,13 @@ public class ModPlay3
 	
 	private void tremolo( int chn )
 	{
-		int speed = ( channelTremoloParam[ chn ] >> 4 ) & 0xF;
-		int depth = channelTremoloParam[ chn ] & 0xF;
 		int phase = channelVibratoPhase[ chn ] & 0x3F;
-		channelTremolo[ chn ] = ( VIBRATO[ phase & 0x1F ] * depth ) >> 6;
+		channelTremolo[ chn ] = ( VIBRATO[ phase & 0x1F ] * channelTremoloDepth[ chn ] ) >> 6;
 		if( phase > 0x1F )
 		{
 			channelTremolo[ chn ] = -channelTremolo[ chn ];
 		}
-		channelVibratoPhase[ chn ] += speed;
+		channelVibratoPhase[ chn ] += channelTremoloSpeed[ chn ];
 	}
 	
 	private static byte[] readBytes( java.io.InputStream inputStream, int length ) throws java.io.IOException
