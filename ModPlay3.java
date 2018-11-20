@@ -172,6 +172,7 @@ public class ModPlay3
 	
 	private void row()
 	{
+		boolean patternBreak = false;
 		if( nextSequencePos < songLength )
 		{
 			currentSequencePos = nextSequencePos;
@@ -194,6 +195,7 @@ public class ModPlay3
 		{
 			nextRow = 0;
 			nextSequencePos = currentSequencePos + 1;
+			patternBreak = true;
 		}
 		for( int chn = 0; chn < numChannels; chn++ )
 		{
@@ -295,13 +297,21 @@ public class ModPlay3
 					break;
 				case 0xB: /* Pattern jump. */
 					nextSequencePos = parameter;
-					nextRow = 0;
+					if( !patternBreak )
+					{
+						nextRow = 0;
+						patternBreak = true;
+					}
 					break;
 				case 0xC: /* Set volume. */
 					channelVolume[ chn ] = parameter;
 					break;
 				case 0xD: /* Pattern break. */
-					nextSequencePos = currentSequencePos + 1;
+					if( !patternBreak )
+					{
+						nextSequencePos = currentSequencePos + 1;
+						patternBreak = true;
+					}
 					nextRow = ( parameter >> 4 ) * 10 + ( parameter & 0xF );
 					break;
 				case 0xE: /* Remapped to 0xEx. */
@@ -316,7 +326,7 @@ public class ModPlay3
 						tempo = channelParameter[ chn ];
 					}
 					break;
-				case 0xE0: /* Set filter.*/
+				case 0xE0: /* Set filter. */
 					break;
 				case 0xE1: /* Fine portamento up. */
 					channelPeriod[ chn ] -= parameter;
@@ -324,13 +334,43 @@ public class ModPlay3
 				case 0xE2: /* Fine portamento down. */
 					channelPeriod[ chn ] += parameter;
 					break;
-				case 0xE3: /* Glissando.*/
-				case 0xE4: /* Set vibrato waveform.*/
+				case 0xE3: /* Glissando. */
+				case 0xE4: /* Set vibrato waveform. */
 					break;
-				case 0xE5: /* Set finetune.*/
+				case 0xE5: /* Set finetune. */
 					sampleFineTune[ channelAssigned[ chn ] ] = parameter;
 					break;
 				case 0xE6: /* Pattern loop. */
+					if( channelPatternLoopRow[ chn ] < currentRow )
+					{
+						if( parameter > 0 )
+						{
+							if( patternLoopCount <= 0 )
+							{
+								patternLoopCount = parameter + 1;
+								patternLoopChannel = chn;
+							}
+							if( patternLoopChannel == chn )
+							{
+								patternLoopCount--;
+								if( patternLoopCount > 0 )
+								{
+									nextSequencePos = currentSequencePos;
+									nextRow = channelPatternLoopRow[ chn ];
+									patternBreak = false;
+								}
+								else
+								{
+									channelPatternLoopRow[ chn ] = currentRow + 1;
+								}
+							}
+						}
+						else
+						{
+							channelPatternLoopRow[ chn ] = currentRow;
+						}
+					}
+					break;
 				case 0xE7: /* Set tremolo waveform. */
 				case 0xE8: /* Panning. */
 				case 0xE9: /* Retrig. */
@@ -349,10 +389,15 @@ public class ModPlay3
 					break;
 				case 0xEF: /* Invert loop. */
 					break;
-				default:
-					throw new UnsupportedOperationException( "Unsupported effect 0x"
-						+ ( Integer.toHexString( channelEffect[ chn ] )
-						+ " " + Integer.toHexString( channelParameter[ chn ] ) ).toUpperCase() );
+			}
+		}
+		if( patternBreak )
+		{
+			patternLoopCount = 0;
+			patternLoopChannel = 0;
+			for( int chn = 0; chn < numChannels; chn++ )
+			{
+				channelPatternLoopRow[ chn ] = 0;
 			}
 		}
 	}
