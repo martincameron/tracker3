@@ -382,7 +382,12 @@ public class ModPlay3
 					channelVolume[ chn ] -= parameter;
 					break;
 				case 0xEC: /* Note cut. */
+					break;
 				case 0xED: /* Note delay. */
+					if( period <= 0 )
+					{
+						channelParameter[ chn ] = 0;
+					}
 					break;
 				case 0xEE: /* Pattern delay. */
 					currentTick += ticksPerRow * parameter;
@@ -472,7 +477,7 @@ public class ModPlay3
 						}
 						break;
 					case 0xED: /* Note delay. */
-						if( effectCounter == channelParameter[ chn ] && channelPortaPeriod[ chn ] > 0 )
+						if( effectCounter == channelParameter[ chn ] )
 						{
 							channelInstrument[ chn ] = channelAssigned[ chn ];
 							channelPeriod[ chn ] = channelPortaPeriod[ chn ];
