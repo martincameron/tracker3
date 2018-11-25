@@ -317,13 +317,13 @@ public class ModPlay3
 				case 0xE: /* Remapped to 0xEx. */
 					break;
 				case 0xF: /* Set speed/tempo.*/
-					if( channelParameter[ chn ] < 32 )
-					{
-						currentTick = ticksPerRow = channelParameter[ chn ];
-					}
-					else
+					if( channelParameter[ chn ] > 31 )
 					{
 						tempo = channelParameter[ chn ];
+					}
+					else if( channelParameter[ chn ] > 0 )
+					{
+						currentTick = ticksPerRow = channelParameter[ chn ];
 					}
 					break;
 				case 0xE0: /* Set filter. */
