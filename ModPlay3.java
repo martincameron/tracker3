@@ -1,7 +1,7 @@
 
 public class ModPlay3
 {
-	private static final int NUM_SAMPLES = 32;
+	private static final int MAX_SAMPLES = 32;
 	private static final int MAX_CHANNELS = 16;
 	private static final int FIXED_POINT_SHIFT = 13;
 	private static final int FIXED_POINT_ONE = 1 << FIXED_POINT_SHIFT;
@@ -31,18 +31,18 @@ public class ModPlay3
 	
 	private int sampleRate;
 	private String songName;
-	private String[] instrumentNames = new String[ NUM_SAMPLES ];
+	private String[] instrumentNames = new String[ MAX_SAMPLES ];
 	private int numChannels;
 	private int songLength;
 	private int numPatterns;
 	private int c2Rate;
 	private byte[] sequence;
 	private byte[] patternData;
-	private byte[][] sampleData = new byte[ NUM_SAMPLES ][];
-	private int[] sampleFineTune = new int[ NUM_SAMPLES ];
-	private int[] sampleVolume = new int[ NUM_SAMPLES ];
-	private int[] sampleLoopStart = new int[ NUM_SAMPLES ];
-	private int[] sampleLoopLength = new int[ NUM_SAMPLES ];
+	private byte[][] sampleData = new byte[ MAX_SAMPLES ][];
+	private int[] sampleFineTune = new int[ MAX_SAMPLES ];
+	private int[] sampleVolume = new int[ MAX_SAMPLES ];
+	private int[] sampleLoopStart = new int[ MAX_SAMPLES ];
+	private int[] sampleLoopLength = new int[ MAX_SAMPLES ];
 	private int[] channelInstrument = new int[ MAX_CHANNELS ];
 	private int[] channelAssigned = new int[ MAX_CHANNELS ];
 	private int[] channelEffect = new int[ MAX_CHANNELS ];
@@ -76,18 +76,20 @@ public class ModPlay3
 	private int tickSamplePos;
 	private int tickSampleLen;
 	
-	public ModPlay3( int sampleRate, java.io.InputStream moduleData ) throws java.io.IOException
+	/* If 'soundtracker' is true, the Module Data is assumed to be in the original Ultimate Soundtracker format. */
+	public ModPlay3( int sampleRate, java.io.InputStream moduleData, boolean soundtracker ) throws java.io.IOException
 	{
 		this.sampleRate = sampleRate;
 		songName = readString( moduleData, 20 );
-		int[] sampleLengths = new int[ NUM_SAMPLES ];
-		for( int idx = 1; idx < NUM_SAMPLES; idx++ )
+		int numSamples = soundtracker ? 16 : 32;
+		int[] sampleLengths = new int[ numSamples ];
+		for( int idx = 1; idx < numSamples; idx++ )
 		{
 			instrumentNames[ idx ] = readString( moduleData, 22 );
 			sampleLengths[ idx ] = ( ( ( moduleData.read() & 0xFF ) << 8 ) | ( moduleData.read() & 0xFF ) ) * 2;
-			sampleFineTune[ idx ] = moduleData.read() & 0xF;
+			sampleFineTune[ idx ] = moduleData.read() & ( soundtracker ? 0 : 0xF );
 			sampleVolume[ idx ] = moduleData.read() & 0x7F;
-			int loopStart = ( ( ( moduleData.read() & 0xFF ) << 8 ) | ( moduleData.read() & 0xFF ) ) * 2;
+			int loopStart = ( ( ( moduleData.read() & 0xFF ) << 8 ) | ( moduleData.read() & 0xFF ) ) * ( soundtracker ? 1 : 2 );
 			int loopLength = ( ( ( moduleData.read() & 0xFF ) << 8 ) | ( moduleData.read() & 0xFF ) ) * 2;
 			if( loopLength < 4 || loopStart > sampleLengths[ idx ] )
 			{
@@ -97,8 +99,8 @@ public class ModPlay3
 			{
 				loopLength = sampleLengths[ idx ] - loopStart;
 			}
-			sampleLoopStart[ idx ]  = loopStart * FIXED_POINT_ONE;
-			sampleLoopLength[ idx ]  = loopLength * FIXED_POINT_ONE;
+			sampleLoopStart[ idx ] = loopStart * FIXED_POINT_ONE;
+			sampleLoopLength[ idx ] = loopLength * FIXED_POINT_ONE;
 		}
 		songLength = moduleData.read() & 0x7F;
 		int restart = moduleData.read() & 0x7F;
@@ -110,7 +112,7 @@ public class ModPlay3
 				numPatterns = sequence[ idx ] + 1;
 			}
 		}
-		String modType = readString( moduleData, 4 );
+		String modType = soundtracker ? "M.K." : readString( moduleData, 4 );
 		if( modType.equals( "M.K." ) )
 		{
 			numChannels = 4;
@@ -121,7 +123,42 @@ public class ModPlay3
 			throw new IllegalArgumentException( "Module not recognised!" );
 		}
 		patternData = readBytes( moduleData, numChannels * 4 * 64 * numPatterns );
-		for( int idx = 1; idx < NUM_SAMPLES; idx++ )
+		if( soundtracker )
+		{
+			for( int idx = 0; idx < patternData.length; idx += 4 )
+			{
+				int key = ( ( patternData[ idx ] & 0xF ) << 8 ) | ( patternData[ idx + 1 ] & 0xFF );
+				int instrument = ( patternData[ idx + 2 ] >> 4 ) & 0xF;
+				int effect = patternData[ idx + 2 ] & 0xF;
+				int param1 = ( patternData[ idx + 3 ] >> 4 ) & 0xF;
+				int param2 = patternData[ idx + 3 ] & 0xF;
+				if( effect == 1 )
+				{
+					effect = 0;
+				}
+				else if( effect == 2 && ( param1 - param2 ) < 0 )
+				{
+					effect = 1;
+					param2 = param2 - param1;
+					param1 = 0;
+				} 
+				else if( effect == 2 )
+				{
+					effect = 2;
+					param2 = param1 - param2;
+					param1 = 0;
+				}
+				else
+				{
+					effect = param1 = param2 = 0;
+				}
+				patternData[ idx ] = ( byte ) ( ( key >> 8 ) & 0xF );
+				patternData[ idx + 1 ] = ( byte ) ( key & 0xFF );
+				patternData[ idx + 2 ] = ( byte ) ( ( instrument << 4 ) | ( effect & 0xF ) );
+				patternData[ idx + 3 ] = ( byte ) ( ( param1 << 4 ) | ( param2 & 0xF ) );
+			}
+		}
+		for( int idx = 1; idx < numSamples; idx++ )
 		{
 			sampleData[ idx ] = readBytes( moduleData, sampleLengths[ idx ] );
 		}
@@ -640,19 +677,35 @@ public class ModPlay3
 	public static void main( String[] args ) throws Exception {
 		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, ( idx - 8 ) / 96.0 ) * FIXED_POINT_ONE ) );
 		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, idx / -12.0 ) * FIXED_POINT_ONE ) );
-		ModPlay3 modPlay3;
+		ModPlay3 modPlay3 = null;
 		java.io.InputStream inputStream = new java.io.FileInputStream( args[ 0 ] );
 		try
 		{
-			modPlay3 = new ModPlay3( 96000, inputStream );
+			modPlay3 = new ModPlay3( 96000, inputStream, false );
+		}
+		catch( IllegalArgumentException e )
+		{
+			System.out.println( e.getMessage() + " Assuming Ultimate Soundtracker format." );
 		}
 		finally
 		{
 			inputStream.close();
 		}
+		if( modPlay3 == null )
+		{
+			inputStream = new java.io.FileInputStream( args[ 0 ] );
+			try
+			{
+				modPlay3 = new ModPlay3( 96000, inputStream, true );
+			}
+			finally
+			{
+				inputStream.close();
+			}
+		}
 		System.out.println( "ModPlay3 (C)2018 Martin Cameron!" );
 		System.out.println( "Playing: " + pad( modPlay3.songName, 20, ' ', false ) + " Len   Loop" );
-		for( int idx = 1; idx < NUM_SAMPLES; idx++ )
+		for( int idx = 1; idx < MAX_SAMPLES && modPlay3.instrumentNames[ idx ] != null; idx++ )
 		{
 			if( modPlay3.sampleData[ idx ].length > 0 || modPlay3.instrumentNames[ idx ].length() > 0 )
 			{
