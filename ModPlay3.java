@@ -161,6 +161,14 @@ public class ModPlay3
 		for( int idx = 1; idx < numSamples; idx++ )
 		{
 			sampleData[ idx ] = readBytes( moduleData, sampleLengths[ idx ] );
+			if( soundtracker && sampleLoopLength[ idx ] > 0 )
+			{
+				byte[] data = sampleData[ idx ];
+				int loopStart = sampleLoopStart[ idx ] >> FIXED_POINT_SHIFT;
+				int loopLength = sampleLoopLength[ idx ] >> FIXED_POINT_SHIFT;
+				System.arraycopy( data, loopStart, data, 0, loopLength );
+				sampleLoopStart[ idx ] = 0;
+			}
 		}
 		for( int chn = 0; chn < MAX_CHANNELS; chn += 4 )
 		{
