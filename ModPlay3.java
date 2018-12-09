@@ -667,6 +667,21 @@ public class ModPlay3
 		}
 	}
 	
+	private static int reverb( int[] buf, int[] reverbBuf, int reverbIdx, int count )
+	{
+		for( int idx = 0; idx < count; idx++ )
+		{
+			buf[ idx * 2 ] = reverbBuf[ reverbIdx ] = ( buf[ idx * 2 ] * 3 + reverbBuf[ reverbIdx + 1 ] ) >> 2;
+			buf[ idx * 2 + 1 ] = reverbBuf[ reverbIdx + 1 ] = ( buf[ idx * 2 + 1 ] * 3 + reverbBuf[ reverbIdx ] ) >> 2;
+			reverbIdx += 2;
+			if( reverbIdx >= reverbBuf.length )
+			{
+				reverbIdx = 0;
+			}
+		}
+		return reverbIdx;
+	}
+	
 	private static String pad( String string, int length, char chr, boolean left )
 	{
 		if( string.length() < length )
@@ -685,11 +700,12 @@ public class ModPlay3
 	public static void main( String[] args ) throws Exception {
 		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, ( idx - 8 ) / 96.0 ) * FIXED_POINT_ONE ) );
 		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, idx / -12.0 ) * FIXED_POINT_ONE ) );
+		final int SAMPLING_RATE = 48000;
 		ModPlay3 modPlay3 = null;
 		java.io.InputStream inputStream = new java.io.FileInputStream( args[ 0 ] );
 		try
 		{
-			modPlay3 = new ModPlay3( 96000, inputStream, false );
+			modPlay3 = new ModPlay3( SAMPLING_RATE * 2, inputStream, false );
 		}
 		catch( IllegalArgumentException e )
 		{
@@ -704,7 +720,7 @@ public class ModPlay3
 			inputStream = new java.io.FileInputStream( args[ 0 ] );
 			try
 			{
-				modPlay3 = new ModPlay3( 96000, inputStream, true );
+				modPlay3 = new ModPlay3( SAMPLING_RATE * 2, inputStream, true );
 			}
 			finally
 			{
@@ -724,13 +740,15 @@ public class ModPlay3
 					+ pad( String.valueOf( len ), 7, ' ', true ) + pad( String.valueOf( loop ), 7, ' ', true ) );
 			}
 		}
-		javax.sound.sampled.AudioFormat audioFormat = new javax.sound.sampled.AudioFormat( 48000, 16, 2, true, false );
+		javax.sound.sampled.AudioFormat audioFormat = new javax.sound.sampled.AudioFormat( SAMPLING_RATE, 16, 2, true, false );
 		javax.sound.sampled.SourceDataLine sourceDataLine = ( javax.sound.sampled.SourceDataLine )
 			javax.sound.sampled.AudioSystem.getLine( new javax.sound.sampled.DataLine.Info(
 				javax.sound.sampled.SourceDataLine.class, audioFormat ) );
 		sourceDataLine.open( audioFormat );
 		sourceDataLine.start();
 		final int MIX_BUF_SAMPLES = 2048;
+		int reverbIdx = 0;
+		int[] reverbBuf = new int[ ( SAMPLING_RATE / 20 ) * 2 ];
 		int[] mixBuf = new int[ ( MIX_BUF_SAMPLES + FILTER_COEFFS.length ) * 2 ];
 		byte[] outBuf = new byte[ MIX_BUF_SAMPLES * 2 ];
 		while( true )
@@ -738,6 +756,7 @@ public class ModPlay3
 			System.arraycopy( mixBuf, MIX_BUF_SAMPLES * 2, mixBuf, 0, FILTER_COEFFS.length * 2 );
 			modPlay3.getAudio( mixBuf, FILTER_COEFFS.length, MIX_BUF_SAMPLES );
 			downsample( mixBuf, MIX_BUF_SAMPLES / 2 );
+			reverbIdx = reverb( mixBuf, reverbBuf, reverbIdx, MIX_BUF_SAMPLES / 2 );
 			for( int idx = 0; idx < MIX_BUF_SAMPLES; idx++ )
 			{
 				int ampl = mixBuf[ idx ];
