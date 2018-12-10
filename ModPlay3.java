@@ -172,8 +172,8 @@ public class ModPlay3
 		}
 		for( int chn = 0; chn < MAX_CHANNELS; chn += 4 )
 		{
-			channelPanning[ chn ] = channelPanning[ chn + 3 ] = FIXED_POINT_ONE / 4;
-			channelPanning[ chn + 1 ] = channelPanning[ chn + 2 ] = FIXED_POINT_ONE / 4 * 3;
+			channelPanning[ chn ] = channelPanning[ chn + 3 ] = FIXED_POINT_ONE / 5;
+			channelPanning[ chn + 1 ] = channelPanning[ chn + 2 ] = FIXED_POINT_ONE * 4 / 5;
 		}
 	}
 	
