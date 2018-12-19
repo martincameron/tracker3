@@ -2,7 +2,7 @@
 public class ModPlay3
 {
 	private static final int MAX_SAMPLES = 32;
-	private static final int MAX_CHANNELS = 16;
+	private static final int MAX_CHANNELS = 8;
 	private static final int FIXED_POINT_SHIFT = 13;
 	private static final int FIXED_POINT_ONE = 1 << FIXED_POINT_SHIFT;
 	
@@ -113,12 +113,17 @@ public class ModPlay3
 			}
 		}
 		String modType = soundtracker ? "M.K." : readString( moduleData, 4 );
-		if( modType.equals( "M.K." ) )
+		if( modType.equals( "M.K." ) || modType.equals( "FLT4" ) )
 		{
 			numChannels = 4;
 			c2Rate = 8287;
 		}
-		else
+		else if( modType.substring( 1 ).equals( "CHN" ) )
+		{
+			numChannels = modType.charAt( 0 ) - '0';
+			c2Rate = 8363;
+		}
+		if( numChannels < 1 || numChannels > MAX_CHANNELS )
 		{
 			throw new IllegalArgumentException( "Module not recognised!" );
 		}
