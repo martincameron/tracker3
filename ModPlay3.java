@@ -275,7 +275,7 @@ public class ModPlay3
 			if( period > 0 )
 			{
 				channelPortaPeriod[ chn ] = period;
-				if( effect != 0x3 && effect != 0x5 && effect != 0xED )
+				if( effect != 0x3 && effect != 0x5 && !( effect == 0xED && parameter > 0 ) )
 				{
 					channelInstrument[ chn ] = channelAssigned[ chn ];
 					channelPeriod[ chn ] = period;
