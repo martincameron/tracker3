@@ -676,8 +676,10 @@ public class ModPlay3
 	{
 		for( int idx = 0; idx < count; idx++ )
 		{
-			buf[ idx * 2 ] = reverbBuf[ reverbIdx ] = ( buf[ idx * 2 ] * 3 + reverbBuf[ reverbIdx + 1 ] ) >> 2;
-			buf[ idx * 2 + 1 ] = reverbBuf[ reverbIdx + 1 ] = ( buf[ idx * 2 + 1 ] * 3 + reverbBuf[ reverbIdx ] ) >> 2;
+			buf[ idx * 2 ] = ( buf[ idx * 2 ] * 3 + reverbBuf[ reverbIdx + 1 ] ) >> 2;
+			buf[ idx * 2 + 1 ] = ( buf[ idx * 2 + 1 ] * 3 + reverbBuf[ reverbIdx ] ) >> 2;
+			reverbBuf[ reverbIdx ] = buf[ idx * 2 ];
+			reverbBuf[ reverbIdx + 1 ] = buf[ idx * 2 + 1 ];
 			reverbIdx += 2;
 			if( reverbIdx >= reverbBuf.length )
 			{
