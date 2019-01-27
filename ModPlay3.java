@@ -62,6 +62,7 @@ public class ModPlay3
 	private int[] channelTremoloSpeed = new int[ MAX_CHANNELS ];
 	private int[] channelTremoloDepth = new int[ MAX_CHANNELS ];
 	private int[] channelPatternLoopRow = new int[ MAX_CHANNELS ];
+	private int[] channelSampleOffset = new int[ MAX_CHANNELS ];
 	private int currentSequencePos;
 	private int nextSequencePos;
 	private int currentRow;
@@ -298,6 +299,7 @@ public class ModPlay3
 			{
 				channelAssigned[ chn ] = instrument;
 				channelVolume[ chn ] = sampleVolume[ instrument ];
+				channelSampleOffset[ chn ] = 0;
 				if( channelSamplePos[ chn ] >= sampleLoopStart[ channelInstrument[ chn ] ]
 					&& sampleLoopLength[ instrument ] > 0 && channelInstrument[ chn ] > 0 )
 				{
@@ -306,6 +308,10 @@ public class ModPlay3
 					channelInstrument[ chn ] = instrument;
 				}
 			}
+			if( effect == 0x9 )
+			{
+				channelSampleOffset[ chn ] = parameter * 256 * FIXED_POINT_ONE;
+			}
 			if( period > 0 )
 			{
 				channelPortaPeriod[ chn ] = period;
@@ -313,7 +319,7 @@ public class ModPlay3
 				{
 					channelInstrument[ chn ] = channelAssigned[ chn ];
 					channelPeriod[ chn ] = period;
-					channelSamplePos[ chn ] = 0;
+					channelSamplePos[ chn ] = channelSampleOffset[ chn ];
 					channelVibratoPhase[ chn ] = 0;
 				}
 			}
@@ -375,7 +381,6 @@ public class ModPlay3
 					}
 					break;
 				case 0x9: /* Set sample offset. */
-					channelSamplePos[ chn ] = parameter * 256 * FIXED_POINT_ONE;
 					break;
 				case 0xA: /* Volume slide. */
 					break;
@@ -565,7 +570,7 @@ public class ModPlay3
 						{
 							channelInstrument[ chn ] = channelAssigned[ chn ];
 							channelPeriod[ chn ] = channelPortaPeriod[ chn ];
-							channelSamplePos[ chn ] = 0;
+							channelSamplePos[ chn ] = channelSampleOffset[ chn ];
 							channelVibratoPhase[ chn ] = 0;
 						}
 						break;
