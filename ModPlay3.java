@@ -29,7 +29,6 @@ public class ModPlay3
 		255, 253, 250, 244,235, 224, 212, 197, 180, 161, 141, 120,  97,  74,  49,  24
 	};
 	
-	private int sampleRate;
 	private String songName;
 	private String[] instrumentNames = new String[ MAX_SAMPLES ];
 	private int numChannels;
@@ -51,7 +50,7 @@ public class ModPlay3
 	private int[] channelPanning = new int[ MAX_CHANNELS ];
 	private int[] channelPeriod = new int[ MAX_CHANNELS ];
 	private int[] channelSamplePos = new int[ MAX_CHANNELS ];
-	private int[] channelStep = new int[ MAX_CHANNELS ];
+	private int[] channelFrequency = new int[ MAX_CHANNELS ];
 	private int[] channelArpeggio = new int[ MAX_CHANNELS ];
 	private int[] channelVibrato = new int[ MAX_CHANNELS ];
 	private int[] channelVibratoSpeed = new int[ MAX_CHANNELS ];
@@ -73,13 +72,11 @@ public class ModPlay3
 	private int effectCounter;
 	private int patternLoopCount;
 	private int patternLoopChannel;
-	private int tickSamplePos;
-	private int tickSampleLen;
+	private int[] rampBuf = new int[ 64 ];
 	
 	/* If 'soundtracker' is true, the Module Data is assumed to be in the original Ultimate Soundtracker format. */
-	public ModPlay3( int sampleRate, java.io.InputStream moduleData, boolean soundtracker ) throws java.io.IOException
+	public ModPlay3( java.io.InputStream moduleData, boolean soundtracker ) throws java.io.IOException
 	{
-		this.sampleRate = sampleRate;
 		songName = readString( moduleData, 20 );
 		int numSamples = soundtracker ? 16 : 32;
 		int[] sampleLengths = new int[ numSamples ];
@@ -182,44 +179,81 @@ public class ModPlay3
 		}
 	}
 	
-	public void getAudio( int[] output, int offset, int count )
+	/* Returns number of stereo samples produced.
+	   Output buffer must be of length sampleRate / 5. */
+	public int getAudio( int sampleRate, int[] output )
 	{
-		for( int idx = offset * 2, end = ( offset + count ) * 2; idx < end; idx += 2 )
+		tick();
+		int count = ( sampleRate * 5 ) / ( tempo * 2 );
+		for( int idx = 0, end = ( count + 32 ) * 2; idx < end; idx++ )
 		{
-			if( tickSamplePos++ >= tickSampleLen )
+			output[ idx ] = 0;
+		}
+		for( int chn = 0; chn < numChannels; chn++ )
+		{
+			resample( chn, output, count + 32, sampleRate );
+			int instrument = channelInstrument[ chn ];
+			int loopStart = sampleLoopStart[ instrument ];
+			int loopLength = sampleLoopLength[ instrument ];
+			int step = channelFrequency[ chn ] * FIXED_POINT_ONE / sampleRate;
+			int samplePos = channelSamplePos[ chn ] + step * count;
+			if( samplePos >= loopStart + loopLength )
 			{
-				tick();
-				tickSamplePos = 0;
-				tickSampleLen = ( sampleRate * 5 ) / ( tempo * 2 );
-			}
-			int lamp = 0, ramp = 0;
-			for( int chn = 0; chn < numChannels; chn++ )
-			{
-				int instrument = channelInstrument[ chn ];
-				int loopLength = sampleLoopLength[ instrument ];
-				int loopEnd = sampleLoopStart[ instrument ] + loopLength;
-				int samplePos = channelSamplePos[ chn ];
-				if( samplePos < loopEnd )
+				if( loopLength > 0 )
 				{
-					int amplitude = sampleData[ instrument ][ samplePos >> FIXED_POINT_SHIFT ] * channelVolume[ chn ];
-					lamp += ( amplitude * ( FIXED_POINT_ONE - channelPanning[ chn ] ) ) >> FIXED_POINT_SHIFT;
-					ramp += ( amplitude * channelPanning[ chn ] ) >> FIXED_POINT_SHIFT;
-					samplePos += channelStep[ chn ];
-					if( loopLength > 0 )
-					{
-						while( samplePos >= loopEnd )
-						{
-							samplePos -= loopLength;
-						}
-					}
-					channelSamplePos[ chn ] = samplePos;
+					samplePos = loopStart + ( samplePos - loopStart ) % loopLength;
+				}
+				else
+				{
+					samplePos = loopStart;
 				}
 			}
-			output[ idx ] = lamp;
-			output[ idx + 1 ] = ramp;
+			channelSamplePos[ chn ] = samplePos;
 		}
+		volumeRamp( output, count );
+		return count;
 	}
 	
+	private void resample( int channel, int[] output, int count, int sampleRate )
+	{
+		int instrument = channelInstrument[ channel ];
+		int loopLength = sampleLoopLength[ instrument ];
+		int loopEnd = sampleLoopStart[ instrument ] + loopLength;
+		int samplePos = channelSamplePos[ channel ];
+		int step = channelFrequency[ channel ] * FIXED_POINT_ONE / sampleRate;
+		int volume = channelVolume[ channel ];
+		int panning = channelPanning[ channel ];
+		for( int idx = 0, end = count * 2; idx < end; idx += 2 )
+		{
+			if( samplePos >= loopEnd )
+			{
+				if( loopLength <= 0 )
+				{
+					return;
+				}
+				while( samplePos >= loopEnd )
+				{
+					samplePos -= loopLength;
+				}
+			}
+			int amplitude = sampleData[ instrument ][ samplePos >> FIXED_POINT_SHIFT ] * volume;
+			output[ idx ] += ( amplitude * ( FIXED_POINT_ONE - panning ) ) >> FIXED_POINT_SHIFT;
+			output[ idx + 1 ] += ( amplitude * panning ) >> FIXED_POINT_SHIFT;
+			samplePos += step;
+		}
+	}
+
+	private void volumeRamp( int[] output, int count )
+	{
+		for( int idx = 0; idx < 32; idx++ )
+		{
+			output[ idx * 2 ] = ( output[ idx * 2 ] * idx + rampBuf[ idx * 2 ] * ( 32 - idx ) ) / 32;
+			rampBuf[ idx * 2 ] = output[ ( count + idx ) * 2 ];
+			output[ idx * 2 + 1 ] = ( output[ idx * 2 + 1 ] * idx + rampBuf[ idx * 2 + 1 ] * ( 32 - idx ) ) / 32;
+			rampBuf[ idx * 2 + 1 ] = output[ ( count + idx ) * 2 + 1 ];
+		}
+	}
+
 	private void row()
 	{
 		boolean patternBreak = false;
@@ -570,8 +604,7 @@ public class ModPlay3
 				}
 				int frequency = c2Rate * 428 / period;
 				int fineTune = sampleFineTune[ channelInstrument[ chn ] ];
-				frequency = ( frequency * FINE_TUNE[ fineTune ] ) >> FIXED_POINT_SHIFT;
-				channelStep[ chn ] = frequency * FIXED_POINT_ONE / sampleRate;
+				channelFrequency[ chn ] = ( frequency * FINE_TUNE[ fineTune ] ) >> FIXED_POINT_SHIFT;
 			}
 		}
 	}
@@ -712,7 +745,7 @@ public class ModPlay3
 		java.io.InputStream inputStream = new java.io.FileInputStream( args[ 0 ] );
 		try
 		{
-			modPlay3 = new ModPlay3( SAMPLING_RATE * 2, inputStream, false );
+			modPlay3 = new ModPlay3( inputStream, false );
 		}
 		catch( IllegalArgumentException e )
 		{
@@ -727,7 +760,7 @@ public class ModPlay3
 			inputStream = new java.io.FileInputStream( args[ 0 ] );
 			try
 			{
-				modPlay3 = new ModPlay3( SAMPLING_RATE * 2, inputStream, true );
+				modPlay3 = new ModPlay3( inputStream, true );
 			}
 			finally
 			{
@@ -753,20 +786,38 @@ public class ModPlay3
 				javax.sound.sampled.SourceDataLine.class, audioFormat ) );
 		sourceDataLine.open( audioFormat );
 		sourceDataLine.start();
-		final int MIX_BUF_SAMPLES = 2048;
-		int reverbIdx = 0;
+		final int DOWNSAMPLE_BUF_SAMPLES = 2048;
+		byte[] outBuf = new byte[ DOWNSAMPLE_BUF_SAMPLES * 2 ];
 		int[] reverbBuf = new int[ ( SAMPLING_RATE / 20 ) * 2 ];
-		int[] mixBuf = new int[ ( MIX_BUF_SAMPLES + FILTER_COEFFS.length ) * 2 ];
-		byte[] outBuf = new byte[ MIX_BUF_SAMPLES * 2 ];
+		int[] downsampleBuf = new int[ ( DOWNSAMPLE_BUF_SAMPLES + FILTER_COEFFS.length ) * 2 ];
+		int[] mixBuf = new int[ SAMPLING_RATE * 2 / 5 ];
+		int mixIdx = 0, mixLen = 0, reverbIdx = 0;
 		while( true )
 		{
-			System.arraycopy( mixBuf, MIX_BUF_SAMPLES * 2, mixBuf, 0, FILTER_COEFFS.length * 2 );
-			modPlay3.getAudio( mixBuf, FILTER_COEFFS.length, MIX_BUF_SAMPLES );
-			downsample( mixBuf, MIX_BUF_SAMPLES / 2 );
-			reverbIdx = reverb( mixBuf, reverbBuf, reverbIdx, MIX_BUF_SAMPLES / 2 );
-			for( int idx = 0; idx < MIX_BUF_SAMPLES; idx++ )
+			System.arraycopy( downsampleBuf, DOWNSAMPLE_BUF_SAMPLES * 2, downsampleBuf, 0, FILTER_COEFFS.length * 2 );
+			int offset = FILTER_COEFFS.length;
+			int length = offset + DOWNSAMPLE_BUF_SAMPLES;
+			while( offset < length )
 			{
-				int ampl = mixBuf[ idx ];
+				if( mixIdx >= mixLen )
+				{
+					mixLen = modPlay3.getAudio( SAMPLING_RATE * 2, mixBuf );
+					mixIdx = 0;
+				}
+				int count = length - offset;
+				if( count > mixLen - mixIdx )
+				{
+					count = mixLen - mixIdx;
+				}
+				System.arraycopy( mixBuf, mixIdx * 2, downsampleBuf, offset * 2, count * 2 );
+				mixIdx += count;
+				offset += count;
+			}
+			downsample( downsampleBuf, DOWNSAMPLE_BUF_SAMPLES / 2 );
+			reverbIdx = reverb( downsampleBuf, reverbBuf, reverbIdx, DOWNSAMPLE_BUF_SAMPLES / 2 );
+			for( int idx = 0; idx < DOWNSAMPLE_BUF_SAMPLES; idx++ )
+			{
+				int ampl = downsampleBuf[ idx ];
 				if( ampl > 32767 )
 				{
 					ampl = 32767;
@@ -778,7 +829,7 @@ public class ModPlay3
 				outBuf[ idx * 2 ] = ( byte ) ampl;
 				outBuf[ idx * 2 + 1 ] = ( byte ) ( ampl >> 8 );
 			}
-			sourceDataLine.write( outBuf, 0, outBuf.length );
+			sourceDataLine.write( outBuf, 0, DOWNSAMPLE_BUF_SAMPLES * 2 );
 		}
 	}
 }
