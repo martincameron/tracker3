@@ -116,7 +116,7 @@ public class ModPlay3
 			numChannels = 4;
 			c2Rate = 8287;
 		}
-		else if( modType.substring( 1 ).equals( "CHN" ) )
+		else if( modType.length() > 0 && modType.substring( 1 ).equals( "CHN" ) )
 		{
 			numChannels = modType.charAt( 0 ) - '0';
 			c2Rate = 8363;
