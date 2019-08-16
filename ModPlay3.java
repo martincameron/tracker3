@@ -116,6 +116,11 @@ public class ModPlay3
 			numChannels = 4;
 			c2Rate = 8287;
 		}
+		else if( modType.equals( "CD81" ) || modType.equals( "OKTA" ) )
+		{
+			numChannels = 8;
+			c2Rate = 8363;
+		}
 		else if( modType.length() > 0 && modType.substring( 1 ).equals( "CHN" ) )
 		{
 			numChannels = modType.charAt( 0 ) - '0';
