@@ -111,7 +111,7 @@ public class ModPlay3
 			}
 		}
 		String modType = soundtracker ? "M.K." : readString( moduleData, 4 );
-		if( modType.equals( "M.K." ) || modType.equals( "FLT4" ) )
+		if( modType.equals( "M.K." ) || modType.equals( "M!K!" ) || modType.equals( "FLT4" ) )
 		{
 			numChannels = 4;
 			c2Rate = 8287;
