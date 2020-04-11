@@ -11,16 +11,22 @@ public class ModPlay3
 		-512, 0, 4096, 8192, 4096, 0, -512
 	};
 	
-	private static final short[] FINE_TUNE =
+	private static final short[] KEY_TO_PERIOD =
 	{
-		8192, 8251, 8311, 8371, 8432, 8493, 8555, 8617,
-		7732, 7788, 7845, 7902, 7959, 8016, 8075, 8133
+		1814, /*
+		 C-0   C#0   D-0   D#0   E-0   F-0   F#0   G-0   G#0   A-1  A#1  B-1 */
+		1712, 1616, 1524, 1440, 1356, 1280, 1208, 1140, 1076, 1016, 960, 907,
+		 856,  808,  762,  720,  678,  640,  604,  570,  538,  508, 480, 453,
+		 428,  404,  381,  360,  339,  320,  302,  285,  269,  254, 240, 226,
+		 214,  202,  190,  180,  170,  160,  151,  143,  135,  127, 120, 113,
+		 107,  101,   95,   90,   85,   80,   75,   71,   67,   63,  60,  56,
+		  53,   50,   47,   45,   42,   40,   37,   35,   33,   31,  30,  28, 26
 	};
 	
-	private static final short[] ARPEGGIO =
+	private static final short[] FINE_TUNE =
 	{
-		8192, 7732, 7298, 6889, 6502, 6137, 5793, 5468,
-		5161, 4871, 4598, 4340, 4096, 3866, 3649, 3444
+		8192, 8133, 8075, 8016, 7959, 7902, 7845, 7788,
+		8679, 8617, 8555, 8493, 8432, 8371, 8311, 8251
 	};
 	
 	private static final short[] VIBRATO =
@@ -131,15 +137,15 @@ public class ModPlay3
 			throw new IllegalArgumentException( "Module not recognised!" );
 		}
 		patternData = readBytes( moduleData, numChannels * 4 * 64 * numPatterns );
-		if( soundtracker )
+		for( int idx = 0; idx < patternData.length; idx += 4 )
 		{
-			for( int idx = 0; idx < patternData.length; idx += 4 )
+			int key = periodToKey( ( ( patternData[ idx ] & 0xF ) << 8 ) | ( patternData[ idx + 1 ] & 0xFF ) );
+			int instrument = ( soundtracker ? 0 : patternData[ idx ] & 0x10 ) | ( ( patternData[ idx + 2 ] >> 4 ) & 0xF );
+			int effect = patternData[ idx + 2 ] & 0xF;
+			int param1 = ( patternData[ idx + 3 ] >> 4 ) & 0xF;
+			int param2 = patternData[ idx + 3 ] & 0xF;
+			if( soundtracker )
 			{
-				int key = ( ( patternData[ idx ] & 0xF ) << 8 ) | ( patternData[ idx + 1 ] & 0xFF );
-				int instrument = ( patternData[ idx + 2 ] >> 4 ) & 0xF;
-				int effect = patternData[ idx + 2 ] & 0xF;
-				int param1 = ( patternData[ idx + 3 ] >> 4 ) & 0xF;
-				int param2 = patternData[ idx + 3 ] & 0xF;
 				if( effect == 1 )
 				{
 					effect = 0;
@@ -160,11 +166,11 @@ public class ModPlay3
 				{
 					effect = param1 = param2 = 0;
 				}
-				patternData[ idx ] = ( byte ) ( ( key >> 8 ) & 0xF );
-				patternData[ idx + 1 ] = ( byte ) ( key & 0xFF );
-				patternData[ idx + 2 ] = ( byte ) ( ( instrument << 4 ) | ( effect & 0xF ) );
-				patternData[ idx + 3 ] = ( byte ) ( ( param1 << 4 ) | ( param2 & 0xF ) );
 			}
+			patternData[ idx ] = ( byte ) key;
+			patternData[ idx + 1 ] = ( byte ) instrument;
+			patternData[ idx + 2 ] = ( byte ) effect;
+			patternData[ idx + 3 ] = ( byte ) ( ( param1 << 4 ) | ( param2 & 0xF ) );
 		}
 		for( int idx = 1; idx < numSamples; idx++ )
 		{
@@ -291,8 +297,8 @@ public class ModPlay3
 		{
 			int rowOffset = sequence[ currentSequencePos ] * 64 + currentRow;
 			int patternDataOffset = ( rowOffset * numChannels + chn ) * 4;
-			int period = ( ( patternData[ patternDataOffset ] & 0xF ) << 8 ) | ( patternData[ patternDataOffset + 1 ] & 0xFF );
-			int instrument = ( patternData[ patternDataOffset ] & 0x10 ) | ( ( patternData[ patternDataOffset + 2 ] & 0xF0 ) >> 4 );
+			int key = patternData[ patternDataOffset ] & 0xFF;
+			int instrument = patternData[ patternDataOffset + 1 ] & 0xFF;
 			int effect = patternData[ patternDataOffset + 2 ] & 0xF;
 			int parameter = patternData[ patternDataOffset + 3 ] & 0xFF;
 			if( effect == 0xE )
@@ -317,13 +323,13 @@ public class ModPlay3
 			{
 				channelSampleOffset[ chn ] = parameter * 256 * FIXED_POINT_ONE;
 			}
-			if( period > 0 )
+			if( key > 0 )
 			{
-				channelPortaPeriod[ chn ] = period;
+				channelPortaPeriod[ chn ] = keyToPeriod( key, sampleFineTune[ channelAssigned[ chn ] ] );
 				if( effect != 0x3 && effect != 0x5 && !( effect == 0xED && parameter > 0 ) )
 				{
 					channelInstrument[ chn ] = channelAssigned[ chn ];
-					channelPeriod[ chn ] = period;
+					channelPeriod[ chn ] = channelPortaPeriod[ chn ];
 					channelSamplePos[ chn ] = channelSampleOffset[ chn ];
 					channelVibratoPhase[ chn ] = 0;
 				}
@@ -430,9 +436,7 @@ public class ModPlay3
 					break;
 				case 0xE3: /* Glissando. */
 				case 0xE4: /* Set vibrato waveform. */
-					break;
 				case 0xE5: /* Set finetune. */
-					sampleFineTune[ channelAssigned[ chn ] ] = parameter;
 					break;
 				case 0xE6: /* Pattern loop. */
 					if( channelPatternLoopRow[ chn ] < currentRow )
@@ -478,7 +482,7 @@ public class ModPlay3
 				case 0xEC: /* Note cut. */
 					break;
 				case 0xED: /* Note delay. */
-					if( period <= 0 )
+					if( key <= 0 )
 					{
 						channelParameter[ chn ] = 0;
 					}
@@ -606,15 +610,12 @@ public class ModPlay3
 			int period = channelPeriod[ chn ];
 			if( period > 0 )
 			{
-				period = period + channelVibrato[ chn ];
-				period = ( period * ARPEGGIO[ channelArpeggio[ chn ] ] ) >> FIXED_POINT_SHIFT;
+				period = transpose( period + channelVibrato[ chn ], channelArpeggio[ chn ] );
 				if( period < 28 )
 				{
-					period = 28;
+					period = 6848;
 				}
-				int frequency = c2Rate * 428 / period;
-				int fineTune = sampleFineTune[ channelInstrument[ chn ] ];
-				channelFrequency[ chn ] = ( frequency * FINE_TUNE[ fineTune ] ) >> FIXED_POINT_SHIFT;
+				channelFrequency[ chn ] = c2Rate * 428 / period;
 			}
 		}
 	}
@@ -666,6 +667,43 @@ public class ModPlay3
 			channelTremolo[ chn ] = -channelTremolo[ chn ];
 		}
 		channelVibratoPhase[ chn ] += channelTremoloSpeed[ chn ];
+	}
+	
+	private static int keyToPeriod( int key, int fineTune )
+	{
+		int period = 0;
+		if( key > 0 && key < 73 )
+		{
+			period = ( KEY_TO_PERIOD[ key ] * FINE_TUNE[ fineTune & 0xF ] ) >> FIXED_POINT_SHIFT - 1;
+		}
+		return ( period >> 1 ) + ( period & 1 );
+	}
+
+	public static int periodToKey( int period )
+	{
+		int key = 0;
+		if( period >= KEY_TO_PERIOD[ 72 ] && period <= KEY_TO_PERIOD[ 1 ] )
+		{
+			while( KEY_TO_PERIOD[ key + 12 ] > period )
+			{
+				key += 12;
+			}
+			while( KEY_TO_PERIOD[ key + 1 ] >= period )
+			{
+				key++;
+			}
+			if( ( KEY_TO_PERIOD[ key ] - period ) >= ( period - KEY_TO_PERIOD[ key + 1 ] ) )
+			{
+				key++;
+			}
+		}
+		return key;
+	}
+	
+	public static int transpose( int period, int semitones )
+	{
+		period = period * KEY_TO_PERIOD[ semitones + 13 ] * 2 / 856;
+		return ( period >> 1 ) + ( period & 1 );
 	}
 	
 	private static byte[] readBytes( java.io.InputStream inputStream, int length ) throws java.io.IOException
@@ -748,7 +786,7 @@ public class ModPlay3
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, ( idx - 8 ) / 96.0 ) * FIXED_POINT_ONE ) );
+		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, ( 8 - idx ) / 96.0 ) * FIXED_POINT_ONE ) );
 		//for( int idx = 0; idx < 16; idx++ ) System.out.println( Math.round( Math.pow( 2, idx / -12.0 ) * FIXED_POINT_ONE ) );
 		final int SAMPLING_RATE = 48000;
 		ModPlay3 modPlay3 = null;
@@ -777,7 +815,7 @@ public class ModPlay3
 				inputStream.close();
 			}
 		}
-		System.out.println( "ModPlay3 (C)2018 Martin Cameron!" );
+		System.out.println( "ModPlay3 (C)2020 Martin Cameron!" );
 		System.out.println( "Playing: " + pad( modPlay3.songName, 20, ' ', false ) + " Len   Loop" );
 		for( int idx = 1; idx < MAX_SAMPLES && modPlay3.instrumentNames[ idx ] != null; idx++ )
 		{
