@@ -252,8 +252,8 @@ public class Monitor3 extends Canvas implements KeyListener, MouseListener, Mous
 	
 	private void createDiskGadgets( int x, int y )
 	{
-		int rows = 8, cols = 32;
-		createTextbox( GADNUM_DIR_TEXTBOX, x, y, ( cols - 1 ) * 8, 28, System.getProperty( "user.home" ), GADNUM_DIR_BUTTON );
+		int rows = 7, cols = 32;
+		createTextbox( GADNUM_DIR_TEXTBOX, x, y, ( cols - 1 ) * 8, 28, "", GADNUM_DIR_BUTTON );
 		createButton( GADNUM_DIR_BUTTON, x + ( cols - 1 ) * 8 + 4, y + 2, 44, 24, "Dir" );
 		createListbox( GADNUM_DIR_LISTBOX, x, y + 32, ( cols + 2 ) * 8, rows * 16 + 12, GADNUM_DIR_SLIDER, GADNUM_LOAD_BUTTON );
 		gadText[ GADNUM_DIR_LISTBOX ] = new String[] {
@@ -267,13 +267,13 @@ public class Monitor3 extends Canvas implements KeyListener, MouseListener, Mous
 			"08                        999999" };
 		gadValues[ GADNUM_DIR_LISTBOX ] = new int[] { 1 };
 		createSlider( GADNUM_DIR_SLIDER, x + ( cols + 2 ) * 8 + 4, y + 32, 20, rows * 16 + 12, 1, 1 );
-		createButton( GADNUM_LOAD_BUTTON, x, y + rows * 16 + 54, 64, 24, "Load" );
-		createButton( GADNUM_SAVE_BUTTON, x + 64 + 4, y + rows * 16 + 54, 64, 24, "Save" );
+		createButton( GADNUM_LOAD_BUTTON, x, y + rows * 16 + 48, 64, 24, "Load" );
+		createButton( GADNUM_SAVE_BUTTON, x + 64 + 4, y + rows * 16 + 48, 64, 24, "Save" );
 	}
 	
 	private void createInstGadgets( int x, int y )
 	{
-		createLabel( GADNUM_INST_LABEL, x, y + 8, "Instrument", TEXT_SHADOW_SELECTED );
+		createLabel( GADNUM_INST_LABEL, x, y + 6, "Instrument", TEXT_SHADOW_SELECTED );
 		createTextbox( GADNUM_INST_TEXTBOX, x + 10 * 8 + 4, y, 4 * 8, 28, "00", 0 );
 		createButton( GADNUM_INST_DEC_BUTTON, x + 15 * 8, y + 2, 24, 24, "<" );
 		createButton( GADNUM_INST_INC_BUTTON, x + 15 * 8 + 28, y + 2, 24, 24, ">" );
@@ -291,7 +291,7 @@ public class Monitor3 extends Canvas implements KeyListener, MouseListener, Mous
 	
 	private void createSequenceGadgets( int x, int y )
 	{
-		int rows = 8;
+		int rows = 7;
 		createTextbox( GADNUM_SEQ_TEXTBOX, x, y, 5 * 8, 28, "000", 0 );
 		createButton( GADNUM_SEQ_INS_BUTTON, x + 5 * 8 + 4, y + 2, 3 * 8, 24, "+" );
 		createButton( GADNUM_SEQ_DEL_BUTTON, x + 9 * 8, y + 2, 3 * 8, 24, "-" );
@@ -308,15 +308,15 @@ public class Monitor3 extends Canvas implements KeyListener, MouseListener, Mous
 		addMouseListener( this );
 		addMouseMotionListener( this );
 
-		createPattern( GADNUM_PATTERN, 4, 220, GADNUM_PATTERN_SLIDER );
-		createSlider( GADNUM_PATTERN_SLIDER, 616, 220, 20, 256, 15, 78 );
-		createDiskGadgets( 4, 6 );
-		createLabel( GADNUM_TITLE_LABEL, 308, 12, "Title", TEXT_SHADOW_SELECTED );
-		createTextbox( GADNUM_TITLE_TEXTBOX, 308 + 6 * 8, 6, 22 * 8, 28, "Test Song.Test Song.", 0 );
-		createInstGadgets( 306, 46 );
-		createSequenceGadgets( 540, 6 );
-		createLabel( GADNUM_VER_LABEL, 200, 192, VERSION, TEXT_HIGHLIGHT_SELECTED );
-		createButton( GADNUM_PLAY_BUTTON, 540, 188, 96, 24, "Play" );
+		createPattern( GADNUM_PATTERN, 4, 192, GADNUM_PATTERN_SLIDER );
+		createSlider( GADNUM_PATTERN_SLIDER, 616, 192, 20, 256, 15, 78 );
+		createDiskGadgets( 4, 4 );
+		createLabel( GADNUM_TITLE_LABEL, 306, 10, "Title", TEXT_SHADOW_SELECTED );
+		createTextbox( GADNUM_TITLE_TEXTBOX, 306 + 5 * 8 + 4, 4, 23 * 8, 28, "Test Song.Test Song.", 0 );
+		createInstGadgets( 306, 36 );
+		createSequenceGadgets( 540, 4 );
+		createLabel( GADNUM_VER_LABEL, 200, 6 + 7 * 16 + 50, VERSION, TEXT_HIGHLIGHT_SELECTED );
+		createButton( GADNUM_PLAY_BUTTON, 540, 6 + 7 * 16 + 46, 96, 24, "Play" );
 
 		gadRedraw[ 0 ] = true;
 
@@ -1158,7 +1158,26 @@ patternData[ 0 ] = 0x01010E6F;
 		switch( gadnum ) 
 		{
 			case GADNUM_DIR_BUTTON:
-				getDir();
+				getDir( new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] ) );
+				break;
+			case GADNUM_LOAD_BUTTON:
+				File file = new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] );
+				if( gadItem[ GADNUM_DIR_LISTBOX ] > 0 )
+				{
+					file = new File( file, gadText[ GADNUM_DIR_LISTBOX ][ gadItem[ GADNUM_DIR_LISTBOX ] ].substring( 6 ) );
+				}
+				else
+				{
+					file = file.getParentFile();
+				}
+				if( file.isDirectory() )
+				{
+					getDir( file );
+				}
+				else
+				{
+					System.out.println( "Load " + file.getAbsolutePath() );
+				}
 				break;
 			default:
 				System.out.println( gadnum );
@@ -1181,25 +1200,25 @@ patternData[ 0 ] = 0x01010E6F;
 	{
 		if( names != null )
 		{
-			names[ 0 ] = "A[Parent Dir]";
+			names[ 0 ] = "[Parent Dir]";
 		}
 		int len = 1;
 		for( int idx = 0; idx < files.length; idx++ )
 		{
 			File file = files[ idx ];
-			if( file.isHidden() )
-			{
-				continue;
-			}
-			else if( file.isDirectory() )
+			if( !file.isHidden() && file.isDirectory() )
 			{
 				if( names != null )
 				{
-					names[ len ] = "D[Dir] " + file.getName();
+					names[ len ] = "[Dir] " + file.getName();
 				}
 				len++;
 			}
-			else if( file.isFile() )
+		}
+		for( int idx = 0; idx < files.length; idx++ )
+		{
+			File file = files[ idx ];
+			if( !file.isHidden() && file.isFile() )
 			{
 				if( names != null )
 				{
@@ -1207,55 +1226,55 @@ patternData[ 0 ] = 0x01010E6F;
 					long size = file.length();
 					if( size > 1048576 * 9216 ) 
 					{
-						prefix = "F(>9g) ";
+						prefix = "(>9g) ";
 					}
 					else if( size > 1024 * 9999 )
 					{
-						prefix = "F" + pad( Long.toString( size / 1048576 ), ' ', 4 ) + "m ";
+						prefix = pad( Long.toString( size / 1048576 ), ' ', 4 ) + "m ";
 					}
 					else if( size > 9999 )
 					{
-						prefix = "F" + pad( Long.toString( size / 1024 ), ' ', 4 ) + "k ";
+						prefix = pad( Long.toString( size / 1024 ), ' ', 4 ) + "k ";
 					}
 					else
 					{
-						prefix = "F" + pad( Long.toString( size ), ' ', 5 );
+						prefix = pad( Long.toString( size ), ' ', 5 ) + " ";
 					}
 					names[ len ] = prefix + file.getName();
 				}
 				len++;
 			}
 		}
-		if( names != null )
-		{
-			Arrays.sort( names );
-			return names;
-		}
-		return getFileNames( files, new String[ len ] );
+		return names != null ? names : getFileNames( files, new String[ len ] );
 	}
 	
-	private void getDir()
+	private void getDir( File file )
 	{
-		File path = new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] );
-		if( path.isDirectory() )
+		if( file == null || !file.isDirectory() )
 		{
-			String[] names = getFileNames( path.listFiles(), null );
-			int[] values = new int[ names.length ];
-			for( int idx = 0; idx < names.length; idx++ )
-			{
-				values[ idx ] = names[ idx ].charAt( 0 ) == 'F' ? 0 : 1;
-				names[ idx ] = names[ idx ].substring( 1 );
-			}
-			gadText[ GADNUM_DIR_LISTBOX ] = names;
-			gadValues[ GADNUM_DIR_LISTBOX ] = values;
-			gadRedraw[ GADNUM_DIR_LISTBOX ] = true;
-			repaint();
+			file = new File( System.getProperty( "user.home" ) );
 		}
+		File[] files = file.listFiles();
+		Arrays.sort( files );
+		String[] names = getFileNames( files, null );
+		int[] values = new int[ names.length ];
+		for( int idx = 0; idx < names.length; idx++ )
+		{
+			values[ idx ] = names[ idx ].charAt( 0 ) == '[' ? 1 : 0;
+		}
+		gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] = file.getAbsolutePath();
+		gadText[ GADNUM_DIR_LISTBOX ] = names;
+		gadItem[ GADNUM_DIR_LISTBOX ] = 0;
+		gadValue[ GADNUM_DIR_SLIDER ] = 0;
+		gadValues[ GADNUM_DIR_LISTBOX ] = values;
+		gadRedraw[ GADNUM_DIR_TEXTBOX ] = true;
+		gadRedraw[ GADNUM_DIR_LISTBOX ] = true;
+		repaint();
 	}
 	
 	public static void main( String[] args ) throws Exception
 	{
-		Monitor3 monitor3 = new Monitor3( 640, 480 );
+		Monitor3 monitor3 = new Monitor3( 640, 452 );
 		Frame frame = new Frame( VERSION );
 		frame.addWindowListener( monitor3 );
 		frame.add( monitor3, BorderLayout.CENTER );
