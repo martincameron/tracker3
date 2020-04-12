@@ -1179,6 +1179,12 @@ patternData[ 0 ] = 0x01010E6F;
 					System.out.println( "Load " + file.getAbsolutePath() );
 				}
 				break;
+			case GADNUM_SEQ_INS_BUTTON:
+				insertSeq();
+				break;
+			case GADNUM_SEQ_DEL_BUTTON:
+				deleteSeq();
+				break;
 			default:
 				System.out.println( gadnum );
 		}
@@ -1270,6 +1276,76 @@ patternData[ 0 ] = 0x01010E6F;
 		gadRedraw[ GADNUM_DIR_TEXTBOX ] = true;
 		gadRedraw[ GADNUM_DIR_LISTBOX ] = true;
 		repaint();
+	}
+	
+	public static int parsePositiveInt( String str, int max )
+	{
+		int value = 0;
+		for( int idx = 0, len = str.length(); idx < len; idx++ )
+		{
+			char chr = str.charAt( idx );
+			if( chr >= '0' && chr <= '9' )
+			{
+				value = value * 10 + chr - '0';
+			}
+		}
+		return value > max ? max : value;
+	}
+	
+	public static byte[] getSequence( String[] items )
+	{
+		byte[] sequence = new byte[ items.length ];
+		for( int idx = 0; idx < items.length; idx++ )
+		{
+			sequence[ idx ] = ( byte ) parsePositiveInt( items[ idx ].substring( 4, 7 ), 127 );
+		}
+		return sequence;
+	}
+	
+	public static String[] getItems( byte[] sequence )
+	{
+		String[] items = new String[ sequence.length ];
+		for( int idx = 0; idx < items.length; idx++ )
+		{
+			String pat = String.valueOf( sequence[ idx ] );
+			items[ idx ] = pad( String.valueOf( idx ), '0', 3 ) + ' ' + pad( pat, '0', 3 );
+		}
+		return items;
+	}
+	
+	public void insertSeq()
+	{
+		byte[] sequence = getSequence( gadText[ GADNUM_SEQ_LISTBOX ] );
+		if( sequence.length < 127 )
+		{
+			byte[] seqNew = new byte[ sequence.length + 1 ];
+			int item = gadItem[ GADNUM_SEQ_LISTBOX ];
+			System.arraycopy( sequence, 0, seqNew, 0, item );
+			seqNew[ item ] = ( byte ) parsePositiveInt( gadText[ GADNUM_SEQ_TEXTBOX ][ 0 ], 127 );
+			System.arraycopy( sequence, item, seqNew, item + 1, sequence.length - item );
+			gadText[ GADNUM_SEQ_LISTBOX ] = getItems( seqNew );
+			gadRedraw[ GADNUM_SEQ_LISTBOX ] = true;
+			repaint();
+		}
+	}
+	
+	public void deleteSeq()
+	{
+		byte[] sequence = getSequence( gadText[ GADNUM_SEQ_LISTBOX ] );
+		if( sequence.length > 1 )
+		{
+			byte[] seqNew = new byte[ sequence.length - 1 ];
+			int item = gadItem[ GADNUM_SEQ_LISTBOX ];
+			System.arraycopy( sequence, 0, seqNew, 0, item );
+			System.arraycopy( sequence, item + 1, seqNew, item, sequence.length - item - 1 );
+			gadText[ GADNUM_SEQ_LISTBOX ] = getItems( seqNew );
+			if( item >= seqNew.length )
+			{
+				gadItem[ GADNUM_SEQ_LISTBOX ] = seqNew.length - 1;
+			}
+			gadRedraw[ GADNUM_SEQ_LISTBOX ] = true;
+			repaint();
+		}
 	}
 	
 	public static void main( String[] args ) throws Exception
