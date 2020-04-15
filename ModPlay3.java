@@ -81,6 +81,25 @@ public class ModPlay3
 	private int patternLoopChannel;
 	private int[] rampBuf = new int[ 64 ];
 	
+	public ModPlay3( int numChannels )
+	{
+		songName = "";
+		for( int idx = 1; idx < MAX_SAMPLES; idx++ )
+		{
+			instrumentNames[ idx ] = "";
+			sampleVolume[ idx ] = 64;
+			sampleData[ idx ] = new byte[ 0 ];
+		}
+		songLength = 1;
+		sequence = new byte[ 1 ];
+		setPatternData( new byte[ numChannels * 4 * 64 ], numChannels );
+		for( int chn = 0; chn < MAX_CHANNELS; chn += 4 )
+		{
+			channelPanning[ chn ] = channelPanning[ chn + 3 ] = FIXED_POINT_ONE / 5;
+			channelPanning[ chn + 1 ] = channelPanning[ chn + 2 ] = FIXED_POINT_ONE * 4 / 5;
+		}
+	}
+	
 	/* If 'soundtracker' is true, the Module Data is assumed to be in the original Ultimate Soundtracker format. */
 	public ModPlay3( java.io.InputStream moduleData, boolean soundtracker ) throws java.io.IOException
 	{
@@ -108,35 +127,34 @@ public class ModPlay3
 		}
 		songLength = moduleData.read() & 0x7F;
 		int restart = moduleData.read() & 0x7F;
+		int patterns = 0;
 		sequence = readBytes( moduleData, 128 );
 		for( int idx = 0; idx < 128; idx++ )
 		{
-			if( numPatterns < sequence[ idx ] + 1 ) 
+			if( patterns < sequence[ idx ] + 1 ) 
 			{
-				numPatterns = sequence[ idx ] + 1;
+				patterns = sequence[ idx ] + 1;
 			}
 		}
+		int channels = 0;
 		String modType = soundtracker ? "M.K." : readString( moduleData, 4 );
 		if( modType.equals( "M.K." ) || modType.equals( "M!K!" ) || modType.equals( "FLT4" ) )
 		{
-			numChannels = 4;
-			c2Rate = 8287;
+			channels = 4;
 		}
 		else if( modType.equals( "CD81" ) || modType.equals( "OKTA" ) )
 		{
-			numChannels = 8;
-			c2Rate = 8363;
+			channels = 8;
 		}
 		else if( modType.length() > 0 && modType.substring( 1 ).equals( "CHN" ) )
 		{
-			numChannels = modType.charAt( 0 ) - '0';
-			c2Rate = 8363;
+			channels = modType.charAt( 0 ) - '0';
 		}
-		if( numChannels < 1 || numChannels > MAX_CHANNELS )
+		if( channels < 1 || channels > MAX_CHANNELS )
 		{
 			throw new IllegalArgumentException( "Module not recognised!" );
 		}
-		patternData = readBytes( moduleData, numChannels * 4 * 64 * numPatterns );
+		setPatternData( readBytes( moduleData, channels * 4 * 64 * patterns ), channels );
 		for( int idx = 0; idx < patternData.length; idx += 4 )
 		{
 			int key = periodToKey( ( ( patternData[ idx ] & 0xF ) << 8 ) | ( patternData[ idx + 1 ] & 0xFF ) );
@@ -189,6 +207,47 @@ public class ModPlay3
 			channelPanning[ chn ] = channelPanning[ chn + 3 ] = FIXED_POINT_ONE / 5;
 			channelPanning[ chn + 1 ] = channelPanning[ chn + 2 ] = FIXED_POINT_ONE * 4 / 5;
 		}
+	}
+	
+	public String getSongName()
+	{
+		return songName;
+	}
+	
+	public String getInstrumentName( int idx )
+	{
+		return instrumentNames[ idx ];
+	}
+	
+	public int getNumChannels()
+	{
+		return numChannels;
+	}
+	
+	public byte[] getSequence()
+	{
+		byte[] sequence = new byte[ songLength ];
+		System.arraycopy( this.sequence, 0, sequence, 0, songLength );
+		return sequence;
+	}
+	
+	public void setSequence( byte[] sequence )
+	{
+		this.sequence = sequence;
+		this.songLength = sequence.length;
+	}
+	
+	public byte[] getPatternData()
+	{
+		return patternData;
+	}
+	
+	public void setPatternData( byte[] patternData, int numChannels )
+	{
+		this.patternData = patternData;
+		this.numChannels = numChannels;
+		this.numPatterns = patternData.length / ( numChannels * 4 * 64 );
+		this.c2Rate = numChannels == 4 ? 8287 : 8363;
 	}
 	
 	/* Returns number of stereo samples produced.
@@ -679,7 +738,7 @@ public class ModPlay3
 		return ( period >> 1 ) + ( period & 1 );
 	}
 
-	public static int periodToKey( int period )
+	private static int periodToKey( int period )
 	{
 		int key = 0;
 		if( period >= KEY_TO_PERIOD[ 72 ] && period <= KEY_TO_PERIOD[ 1 ] )
@@ -700,7 +759,7 @@ public class ModPlay3
 		return key;
 	}
 	
-	public static int transpose( int period, int semitones )
+	private static int transpose( int period, int semitones )
 	{
 		period = period * KEY_TO_PERIOD[ semitones + 13 ] * 2 / 856;
 		return ( period >> 1 ) + ( period & 1 );

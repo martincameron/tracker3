@@ -17,11 +17,13 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.Arrays;
 
-public class Monitor3 extends Canvas implements KeyListener, MouseListener, MouseMotionListener, WindowListener
+public class Tracker3 extends Canvas implements KeyListener, MouseListener, MouseMotionListener, WindowListener
 {
-	public static final String VERSION = "Monitor3 (c)2020 mumart@gmail.com";
+	public static final String VERSION = "Tracker3 (c)2020 mumart@gmail.com";
 	
 	private static final long[] TOPAZ_8 = new long[] {
 		0x0000000000000000L,
@@ -230,7 +232,7 @@ public class Monitor3 extends Canvas implements KeyListener, MouseListener, Mous
 	
 	private Image charset, image;
 	
-	private int[] patternData = new int[ 8 * 64 * 128 ];
+	private ModPlay3 modPlay3 = new ModPlay3( 8 );
 	
 	private static Color toColor( int rgb12 )
 	{
@@ -292,15 +294,15 @@ public class Monitor3 extends Canvas implements KeyListener, MouseListener, Mous
 	private void createSequenceGadgets( int x, int y )
 	{
 		int rows = 7;
-		createTextbox( GADNUM_SEQ_TEXTBOX, x, y, 5 * 8, 28, "000", 0 );
+		createTextbox( GADNUM_SEQ_TEXTBOX, x, y, 5 * 8, 28, "0", 0 );
 		createButton( GADNUM_SEQ_INS_BUTTON, x + 5 * 8 + 4, y + 2, 3 * 8, 24, "+" );
 		createButton( GADNUM_SEQ_DEL_BUTTON, x + 9 * 8, y + 2, 3 * 8, 24, "-" );
 		createListbox( GADNUM_SEQ_LISTBOX, x, y + 32, 9 * 8, rows * 16 + 12, GADNUM_SEQ_SLIDER, 0 );
-		gadText[ GADNUM_SEQ_LISTBOX ] = new String[] { "000 000", "001 000" };
+		gadText[ GADNUM_SEQ_LISTBOX ] = new String[] { "000   0" };
 		createSlider( GADNUM_SEQ_SLIDER, x + 9 * 8 + 4, y + 32, 20, rows * 16 + 12, 1, 1 );
 	}
 	
-	public Monitor3( int width, int height )
+	public Tracker3( int width, int height )
 	{
 		this.width = width;
 		this.height = height;
@@ -320,7 +322,11 @@ public class Monitor3 extends Canvas implements KeyListener, MouseListener, Mous
 
 		gadRedraw[ 0 ] = true;
 
-patternData[ 0 ] = 0x01010E6F;
+byte[] patternData = modPlay3.getPatternData();
+patternData[ 0 ] = 0x01;
+patternData[ 1 ] = 0x1F;
+patternData[ 2 ] = 0x0C;
+patternData[ 3 ] = 0x40;
 	}
 	
 	public void keyPressed( KeyEvent e )
@@ -1004,11 +1010,12 @@ patternData[ 0 ] = 0x01010E6F;
 	
 	private String getNote( int pat, int row, int channel )
 	{
-		int note = patternData[ ( pat * 64 + row ) * 8 + channel ];
-		int key = ( note >> 24 ) & 0xFF;
-		int instrument = ( note >> 16 ) & 0xFF;
-		int effect = ( note >> 8 ) & 0xFF;
-		int param = note & 0xFF;
+		byte[] patternData = modPlay3.getPatternData();
+		int offset = ( ( pat * 64 + row ) * 8 + channel ) * 4;
+		int key = patternData[ offset ] & 0xFF;
+		int instrument = patternData[ offset + 1 ] & 0xFF;
+		int effect = patternData[ offset + 2 ] & 0xFF;
+		int param = patternData[ offset + 3 ] & 0xFF;
 		char[] chars = new char[ 8 ];
 		chars[ 0 ] = ( key > 0 && key < 118 ) ? KEY_TO_STR.charAt( ( ( key + 2 ) % 12 ) * 2 ) : '-';
 		chars[ 1 ] = ( key > 0 && key < 118 ) ? KEY_TO_STR.charAt( ( ( key + 2 ) % 12 ) * 2 + 1 ) : '-';
@@ -1155,38 +1162,45 @@ patternData[ 0 ] = 0x01010E6F;
 	
 	private void action( int gadnum )
 	{
-		switch( gadnum ) 
+		try
 		{
-			case GADNUM_DIR_BUTTON:
-				getDir( new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] ) );
-				break;
-			case GADNUM_LOAD_BUTTON:
-				File file = new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] );
-				if( gadItem[ GADNUM_DIR_LISTBOX ] > 0 )
-				{
-					file = new File( file, gadText[ GADNUM_DIR_LISTBOX ][ gadItem[ GADNUM_DIR_LISTBOX ] ].substring( 6 ) );
-				}
-				else
-				{
-					file = file.getParentFile();
-				}
-				if( file.isDirectory() )
-				{
-					getDir( file );
-				}
-				else
-				{
-					System.out.println( "Load " + file.getAbsolutePath() );
-				}
-				break;
-			case GADNUM_SEQ_INS_BUTTON:
-				insertSeq();
-				break;
-			case GADNUM_SEQ_DEL_BUTTON:
-				deleteSeq();
-				break;
-			default:
-				System.out.println( gadnum );
+			switch( gadnum ) 
+			{
+				case GADNUM_DIR_BUTTON:
+					getDir( new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] ) );
+					break;
+				case GADNUM_LOAD_BUTTON:
+					File file = new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] );
+					if( gadItem[ GADNUM_DIR_LISTBOX ] > 0 )
+					{
+						file = new File( file, gadText[ GADNUM_DIR_LISTBOX ][ gadItem[ GADNUM_DIR_LISTBOX ] ].substring( 6 ) );
+					}
+					else
+					{
+						file = file.getParentFile();
+					}
+					if( file.isDirectory() )
+					{
+						getDir( file );
+					}
+					else
+					{
+						load( file );
+					}
+					break;
+				case GADNUM_SEQ_INS_BUTTON:
+					insertSeq();
+					break;
+				case GADNUM_SEQ_DEL_BUTTON:
+					deleteSeq();
+					break;
+				default:
+					System.out.println( gadnum );
+			}
+		}
+		catch( Exception e )
+		{
+			e.printStackTrace();
 		}
 	}
 	
@@ -1202,7 +1216,7 @@ patternData[ 0 ] = 0x01010E6F;
 		return new String( chars );
 	}
 	
-	private String[] getFileNames( File[] files, String[] names )
+	private static String[] getFileNames( File[] files, String[] names )
 	{
 		if( names != null )
 		{
@@ -1278,7 +1292,7 @@ patternData[ 0 ] = 0x01010E6F;
 		repaint();
 	}
 	
-	public static int parsePositiveInt( String str, int max )
+	private static int parsePositiveInt( String str, int max )
 	{
 		int value = 0;
 		for( int idx = 0, len = str.length(); idx < len; idx++ )
@@ -1292,7 +1306,7 @@ patternData[ 0 ] = 0x01010E6F;
 		return value > max ? max : value;
 	}
 	
-	public static byte[] getSequence( String[] items )
+	private static byte[] getSequence( String[] items )
 	{
 		byte[] sequence = new byte[ items.length ];
 		for( int idx = 0; idx < items.length; idx++ )
@@ -1302,34 +1316,34 @@ patternData[ 0 ] = 0x01010E6F;
 		return sequence;
 	}
 	
-	public static String[] getItems( byte[] sequence )
+	private static String[] getSeqItems( byte[] sequence )
 	{
 		String[] items = new String[ sequence.length ];
 		for( int idx = 0; idx < items.length; idx++ )
 		{
 			String pat = String.valueOf( sequence[ idx ] );
-			items[ idx ] = pad( String.valueOf( idx ), '0', 3 ) + ' ' + pad( pat, '0', 3 );
+			items[ idx ] = pad( String.valueOf( idx ), '0', 3 ) + ' ' + pad( pat, ' ', 3 );
 		}
 		return items;
 	}
 	
-	public void insertSeq()
+	private void insertSeq()
 	{
 		byte[] sequence = getSequence( gadText[ GADNUM_SEQ_LISTBOX ] );
 		if( sequence.length < 127 )
 		{
 			byte[] seqNew = new byte[ sequence.length + 1 ];
 			int item = gadItem[ GADNUM_SEQ_LISTBOX ];
-			System.arraycopy( sequence, 0, seqNew, 0, item );
-			seqNew[ item ] = ( byte ) parsePositiveInt( gadText[ GADNUM_SEQ_TEXTBOX ][ 0 ], 127 );
-			System.arraycopy( sequence, item, seqNew, item + 1, sequence.length - item );
-			gadText[ GADNUM_SEQ_LISTBOX ] = getItems( seqNew );
+			System.arraycopy( sequence, 0, seqNew, 0, item + 1 );
+			seqNew[ item + 1 ] = ( byte ) parsePositiveInt( gadText[ GADNUM_SEQ_TEXTBOX ][ 0 ], 127 );
+			System.arraycopy( sequence, item + 1, seqNew, item + 2, sequence.length - item - 1 );
+			gadText[ GADNUM_SEQ_LISTBOX ] = getSeqItems( seqNew );
 			gadRedraw[ GADNUM_SEQ_LISTBOX ] = true;
 			repaint();
 		}
 	}
 	
-	public void deleteSeq()
+	private void deleteSeq()
 	{
 		byte[] sequence = getSequence( gadText[ GADNUM_SEQ_LISTBOX ] );
 		if( sequence.length > 1 )
@@ -1338,7 +1352,7 @@ patternData[ 0 ] = 0x01010E6F;
 			int item = gadItem[ GADNUM_SEQ_LISTBOX ];
 			System.arraycopy( sequence, 0, seqNew, 0, item );
 			System.arraycopy( sequence, item + 1, seqNew, item, sequence.length - item - 1 );
-			gadText[ GADNUM_SEQ_LISTBOX ] = getItems( seqNew );
+			gadText[ GADNUM_SEQ_LISTBOX ] = getSeqItems( seqNew );
 			if( item >= seqNew.length )
 			{
 				gadItem[ GADNUM_SEQ_LISTBOX ] = seqNew.length - 1;
@@ -1348,12 +1362,44 @@ patternData[ 0 ] = 0x01010E6F;
 		}
 	}
 	
+	private void load( File file ) throws IOException
+	{
+		System.out.println( "Load " + file.getAbsolutePath() );
+		FileInputStream inputStream = new FileInputStream( file );
+		try
+		{
+			modPlay3 = new ModPlay3( inputStream, false );
+		}
+		finally
+		{
+			inputStream.close();
+		}
+		int channels = modPlay3.getNumChannels();
+		if( channels < 8 )
+		{
+			int stride = channels * 4;
+			int rows = modPlay3.getPatternData().length / stride;
+			byte[] patternData = new byte[ rows * 8 * 4 ];
+			for( int idx = 0; idx < rows; idx++ )
+			{
+				System.arraycopy( modPlay3.getPatternData(), idx * stride, patternData, idx * 8 * 4, stride );
+			}
+			modPlay3.setPatternData( patternData, 8 );
+		}
+		gadText[ GADNUM_TITLE_TEXTBOX ][ 0 ] = modPlay3.getSongName();
+		gadRedraw[ GADNUM_TITLE_TEXTBOX ] = true;
+		gadText[ GADNUM_SEQ_LISTBOX ] = getSeqItems( modPlay3.getSequence() );
+		gadRedraw[ GADNUM_SEQ_LISTBOX ] = true;
+		gadRedraw[ GADNUM_PATTERN ] = true;
+		repaint();
+	}
+	
 	public static void main( String[] args ) throws Exception
 	{
-		Monitor3 monitor3 = new Monitor3( 640, 452 );
+		Tracker3 tracker3 = new Tracker3( 640, 452 );
 		Frame frame = new Frame( VERSION );
-		frame.addWindowListener( monitor3 );
-		frame.add( monitor3, BorderLayout.CENTER );
+		frame.addWindowListener( tracker3 );
+		frame.add( tracker3, BorderLayout.CENTER );
 		frame.pack();
 		frame.setResizable( false );
 		frame.setVisible( true );
