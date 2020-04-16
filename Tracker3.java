@@ -1378,8 +1378,8 @@ patternData[ 3 ] = 0x40;
 		if( channels < 8 )
 		{
 			int stride = channels * 4;
+			byte[] patternData = new byte[ 8 * 4 * 64 * 128 ];
 			int rows = modPlay3.getPatternData().length / stride;
-			byte[] patternData = new byte[ rows * 8 * 4 ];
 			for( int idx = 0; idx < rows; idx++ )
 			{
 				System.arraycopy( modPlay3.getPatternData(), idx * stride, patternData, idx * 8 * 4, stride );

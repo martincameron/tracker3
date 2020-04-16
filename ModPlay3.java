@@ -74,8 +74,8 @@ public class ModPlay3
 	private int currentRow;
 	private int nextRow;
 	private int currentTick;
-	private int ticksPerRow = 6;
-	private int tempo = 125;
+	private int ticksPerRow;
+	private int tempo;
 	private int effectCounter;
 	private int patternLoopCount;
 	private int patternLoopChannel;
@@ -93,11 +93,7 @@ public class ModPlay3
 		songLength = 1;
 		sequence = new byte[ 1 ];
 		setPatternData( new byte[ numChannels * 4 * 64 ], numChannels );
-		for( int chn = 0; chn < MAX_CHANNELS; chn += 4 )
-		{
-			channelPanning[ chn ] = channelPanning[ chn + 3 ] = FIXED_POINT_ONE / 5;
-			channelPanning[ chn + 1 ] = channelPanning[ chn + 2 ] = FIXED_POINT_ONE * 4 / 5;
-		}
+		setSequencePos( 0, 0 );
 	}
 	
 	/* If 'soundtracker' is true, the Module Data is assumed to be in the original Ultimate Soundtracker format. */
@@ -202,11 +198,7 @@ public class ModPlay3
 				sampleLoopStart[ idx ] = 0;
 			}
 		}
-		for( int chn = 0; chn < MAX_CHANNELS; chn += 4 )
-		{
-			channelPanning[ chn ] = channelPanning[ chn + 3 ] = FIXED_POINT_ONE / 5;
-			channelPanning[ chn + 1 ] = channelPanning[ chn + 2 ] = FIXED_POINT_ONE * 4 / 5;
-		}
+		setSequencePos( 0, 0 );
 	}
 	
 	public String getSongName()
@@ -250,6 +242,83 @@ public class ModPlay3
 		this.c2Rate = numChannels == 4 ? 8287 : 8363;
 	}
 	
+	/* Set the position in the sequence. The tempo is reset to the default. */
+	public void setSequencePos( int sequencePos, int row )
+	{
+		if( sequencePos < 0 || sequencePos >= songLength )
+		{
+			sequencePos = 0;
+		}
+		if( row < 0 || row > 63 )
+		{
+			row = 0;
+		}
+		clear( channelInstrument );
+		clear( channelAssigned );
+		clear( channelEffect );
+		clear( channelParameter );
+		clear( channelVolume );
+		clear( channelPanning );
+		clear( channelPeriod );
+		clear( channelSamplePos );
+		clear( channelFrequency );
+		clear( channelArpeggio );
+		clear( channelVibrato );
+		clear( channelVibratoSpeed );
+		clear( channelVibratoDepth );
+		clear( channelVibratoPhase );
+		clear( channelPortaPeriod );
+		clear( channelPortaSpeed );
+		clear( channelTremolo );
+		clear( channelTremoloSpeed );
+		clear( channelTremoloDepth );
+		clear( channelPatternLoopRow );
+		clear( channelSampleOffset );
+		currentSequencePos = nextSequencePos = sequencePos;
+		currentRow = nextRow = row;
+		currentTick = 0;
+		ticksPerRow = 6;
+		tempo = 125;
+		effectCounter = 0;
+		patternLoopCount = 0;
+		patternLoopChannel = 0;
+		clear( rampBuf );
+		for( int chn = 0; chn < MAX_CHANNELS; chn += 4 )
+		{
+			channelPanning[ chn ] = channelPanning[ chn + 3 ] = FIXED_POINT_ONE / 5;
+			channelPanning[ chn + 1 ] = channelPanning[ chn + 2 ] = FIXED_POINT_ONE * 4 / 5;
+		}
+	}
+	
+	/* Seek to the specified position in the sequence. */
+	public void seek( int sequencePos, int row, int sampleRate )
+	{
+		if( sequencePos < 0 || sequencePos >= songLength )
+		{
+			sequencePos = 0;
+		}
+		if( row < 0 || row > 63 )
+		{
+			row = 0;
+		}
+		setSequencePos( 0, 0 );
+		tick();
+		while( currentSequencePos < sequencePos || currentRow < row )
+		{
+			int count = ( sampleRate * 5 ) / ( tempo * 2 );
+			for( int chn = 0; chn < numChannels; chn++ )
+			{
+				updateSamplePos( chn, count, sampleRate );
+			}
+			boolean songEnd = tick();
+			if( songEnd )
+			{
+				setSequencePos( sequencePos, row );
+				return;
+			}
+		}
+	}
+	
 	/* Returns number of stereo samples produced.
 	   Output buffer must be of length sampleRate / 5. */
 	public int getAudio( int sampleRate, int[] output )
@@ -263,26 +332,31 @@ public class ModPlay3
 		for( int chn = 0; chn < numChannels; chn++ )
 		{
 			resample( chn, output, count + 32, sampleRate );
-			int instrument = channelInstrument[ chn ];
-			int loopStart = sampleLoopStart[ instrument ];
-			int loopLength = sampleLoopLength[ instrument ];
-			int step = channelFrequency[ chn ] * FIXED_POINT_ONE / sampleRate;
-			int samplePos = channelSamplePos[ chn ] + step * count;
-			if( samplePos >= loopStart + loopLength )
-			{
-				if( loopLength > 0 )
-				{
-					samplePos = loopStart + ( samplePos - loopStart ) % loopLength;
-				}
-				else
-				{
-					samplePos = loopStart;
-				}
-			}
-			channelSamplePos[ chn ] = samplePos;
+			updateSamplePos( chn, count, sampleRate );
 		}
 		volumeRamp( output, count );
 		return count;
+	}
+	
+	private void updateSamplePos( int channel, int count, int sampleRate )
+	{
+		int instrument = channelInstrument[ channel ];
+		int loopStart = sampleLoopStart[ instrument ];
+		int loopLength = sampleLoopLength[ instrument ];
+		int step = channelFrequency[ channel ] * FIXED_POINT_ONE / sampleRate;
+		int samplePos = channelSamplePos[ channel ] + step * count;
+		if( samplePos >= loopStart + loopLength )
+		{
+			if( loopLength > 0 )
+			{
+				samplePos = loopStart + ( samplePos - loopStart ) % loopLength;
+			}
+			else
+			{
+				samplePos = loopStart;
+			}
+		}
+		channelSamplePos[ channel ] = samplePos;
 	}
 	
 	private void resample( int channel, int[] output, int count, int sampleRate )
@@ -325,8 +399,9 @@ public class ModPlay3
 		}
 	}
 
-	private void row()
+	private boolean row()
 	{
+		boolean songEnd = nextSequencePos <= currentSequencePos && nextRow <= currentRow && patternLoopCount <= 0;
 		boolean patternBreak = false;
 		if( nextSequencePos < songLength )
 		{
@@ -562,13 +637,15 @@ public class ModPlay3
 				channelPatternLoopRow[ chn ] = 0;
 			}
 		}
+		return songEnd;
 	}
 	
-	private void tick()
+	private boolean tick()
 	{
+		boolean songEnd = false;
 		if( --currentTick <= 0 )
 		{
-			row();
+			songEnd = row();
 			effectCounter = 0;
 		}
 		else
@@ -677,6 +754,7 @@ public class ModPlay3
 				channelFrequency[ chn ] = c2Rate * 428 / period;
 			}
 		}
+		return songEnd;
 	}
 	
 	private void tonePortamento( int chn )
@@ -842,6 +920,14 @@ public class ModPlay3
 			return new String( chars );
 		}
 		return string;
+	}
+	
+	private static void clear( int[] array )
+	{
+		for( int idx = 0; idx < array.length; idx++ )
+		{
+			array[ idx ] = 0;
+		}
 	}
 	
 	public static void main( String[] args ) throws Exception {
