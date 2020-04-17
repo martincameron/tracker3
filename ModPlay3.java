@@ -201,6 +201,59 @@ public class ModPlay3
 		setSequencePos( 0, 0 );
 	}
 	
+	public void writeModule( java.io.OutputStream outputStream ) throws java.io.IOException
+	{
+		byte[] header = new byte[ 1084 ];
+		writeAscii( songName, header, 0, 20 );
+		for( int idx = 1; idx < MAX_SAMPLES; idx++ )
+		{
+			writeAscii( instrumentNames[ idx ], header, idx * 30 - 10, 22 );
+			header[ idx * 30 + 12 ] = ( byte ) ( sampleData[ idx ].length >> 9 );
+			header[ idx * 30 + 13 ] = ( byte ) ( sampleData[ idx ].length >> 1 );
+			header[ idx * 30 + 14 ] = ( byte ) sampleFineTune[ idx ];
+			header[ idx * 30 + 15 ] = ( byte ) sampleVolume[ idx ];
+			header[ idx * 30 + 16 ] = ( byte ) ( sampleLoopStart[ idx ] >> FIXED_POINT_SHIFT + 9 );
+			header[ idx * 30 + 17 ] = ( byte ) ( sampleLoopStart[ idx ] >> FIXED_POINT_SHIFT + 1 );
+			header[ idx * 30 + 18 ] = ( byte ) ( sampleLoopLength[ idx ] >> FIXED_POINT_SHIFT + 9 );
+			header[ idx * 30 + 19 ] = ( byte ) ( sampleLoopLength[ idx ] >> FIXED_POINT_SHIFT + 1 );
+		}
+		header[ 950 ] = ( byte ) songLength;
+		System.arraycopy( sequence, 0, header, 952, songLength );
+		if( numChannels == 4 )
+		{
+			writeAscii( "M.K.", header, 1080, 4 );
+		}
+		else
+		{
+			header[ 1080 ] = ( byte ) ( '0' + numChannels );
+			writeAscii( "CHN", header, 1081, 3 );
+		}
+		outputStream.write( header );
+		int count = 0;
+		for( int idx = 0; idx < songLength; idx++ )
+		{
+			if( count < sequence[ idx ] + 1 ) 
+			{
+				count = sequence[ idx ] + 1;
+			}
+		}
+		byte[] patterns = new byte[ numChannels * 4 * 64 * count ];
+		for( int idx = 0; idx < patterns.length; idx += 4 )
+		{
+			int period = keyToPeriod( patternData[ idx ] & 0xFF, 0 );
+			int instrument = patternData[ idx + 1 ] & 0x1F;
+			patterns[ idx ] = ( byte ) ( ( instrument & 0x10 ) | ( ( period >> 8 ) & 0xF ) );
+			patterns[ idx + 1 ] = ( byte ) ( period & 0xFF );
+			patterns[ idx + 2 ] = ( byte ) ( ( ( instrument & 0xF ) << 4 ) | ( patternData[ idx + 2 ] & 0xF ) );
+			patterns[ idx + 3 ] = patternData[ idx + 3 ];
+		}
+		outputStream.write( patterns );
+		for( int idx = 1; idx < MAX_SAMPLES; idx++ )
+		{
+			outputStream.write( sampleData[ idx ], 0, sampleData[ idx ].length & -2 );
+		}
+	}
+	
 	public String getSongName()
 	{
 		return songName;
@@ -288,6 +341,7 @@ public class ModPlay3
 			channelPanning[ chn ] = channelPanning[ chn + 3 ] = FIXED_POINT_ONE / 5;
 			channelPanning[ chn + 1 ] = channelPanning[ chn + 2 ] = FIXED_POINT_ONE * 4 / 5;
 		}
+		tick();
 	}
 	
 	/* Seek to the specified position in the sequence. */
@@ -302,7 +356,6 @@ public class ModPlay3
 			row = 0;
 		}
 		setSequencePos( 0, 0 );
-		tick();
 		while( currentSequencePos < sequencePos || currentRow < row )
 		{
 			int count = ( sampleRate * 5 ) / ( tempo * 2 );
@@ -323,7 +376,6 @@ public class ModPlay3
 	   Output buffer must be of length sampleRate / 5. */
 	public int getAudio( int sampleRate, int[] output )
 	{
-		tick();
 		int count = ( sampleRate * 5 ) / ( tempo * 2 );
 		for( int idx = 0, end = ( count + 32 ) * 2; idx < end; idx++ )
 		{
@@ -335,6 +387,7 @@ public class ModPlay3
 			updateSamplePos( chn, count, sampleRate );
 		}
 		volumeRamp( output, count );
+		tick();
 		return count;
 	}
 	
@@ -927,6 +980,14 @@ public class ModPlay3
 		for( int idx = 0; idx < array.length; idx++ )
 		{
 			array[ idx ] = 0;
+		}
+	}
+	
+	private static void writeAscii( String text, byte[] outBuf, int offset, int len )
+	{
+		for( int idx = 0; idx < len; idx++ )
+		{
+			outBuf[ offset + idx ] = ( byte ) ( idx < text.length() ? text.charAt( idx ) : 32 );
 		}
 	}
 	
