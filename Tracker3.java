@@ -233,6 +233,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private Image charset, image;
 	
 	private ModPlay3 modPlay3 = new ModPlay3( 8 );
+	private int instrument;
 	
 	private static Color toColor( int rgb12 )
 	{
@@ -258,16 +259,6 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		createTextbox( GADNUM_DIR_TEXTBOX, x, y, ( cols - 1 ) * 8, 28, "", GADNUM_DIR_BUTTON );
 		createButton( GADNUM_DIR_BUTTON, x + ( cols - 1 ) * 8 + 4, y + 2, 44, 24, "Dir" );
 		createListbox( GADNUM_DIR_LISTBOX, x, y + 32, ( cols + 2 ) * 8, rows * 16 + 12, GADNUM_DIR_SLIDER, GADNUM_LOAD_BUTTON );
-		gadText[ GADNUM_DIR_LISTBOX ] = new String[] {
-			"01 [001 C-2 C#D#EF#G#A#B] 999999",
-			"02                        999999",
-			"03                        999999",
-			"04                        999999",
-			"05                        999999",
-			"06                        999999",
-			"07                        999999",
-			"08                        999999" };
-		gadValues[ GADNUM_DIR_LISTBOX ] = new int[] { 1 };
 		createSlider( GADNUM_DIR_SLIDER, x + ( cols + 2 ) * 8 + 4, y + 32, 20, rows * 16 + 12, 1, 1 );
 		createButton( GADNUM_LOAD_BUTTON, x, y + rows * 16 + 48, 64, 24, "Load" );
 		createButton( GADNUM_SAVE_BUTTON, x + 64 + 4, y + rows * 16 + 48, 64, 24, "Save" );
@@ -314,11 +305,14 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		createSlider( GADNUM_PATTERN_SLIDER, 616, 192, 20, 256, 15, 78 );
 		createDiskGadgets( 4, 4 );
 		createLabel( GADNUM_TITLE_LABEL, 306, 10, "Title", TEXT_SHADOW_SELECTED );
-		createTextbox( GADNUM_TITLE_TEXTBOX, 306 + 5 * 8 + 4, 4, 23 * 8, 28, "Test Song.Test Song.", 0 );
+		createTextbox( GADNUM_TITLE_TEXTBOX, 306 + 5 * 8 + 4, 4, 23 * 8, 28, "", 0 );
 		createInstGadgets( 306, 36 );
 		createSequenceGadgets( 540, 4 );
 		createLabel( GADNUM_VER_LABEL, 200, 6 + 7 * 16 + 50, VERSION, TEXT_HIGHLIGHT_SELECTED );
 		createButton( GADNUM_PLAY_BUTTON, 540, 6 + 7 * 16 + 46, 96, 24, "Play" );
+
+		getDir( null );
+		setInstrument( 1 );
 
 		gadRedraw[ 0 ] = true;
 
@@ -927,8 +921,9 @@ patternData[ 3 ] = 0x40;
 	private void clickListbox( int gadnum )
 	{
 		int time = ( int ) System.currentTimeMillis();
+		int dt = time - gadRange[ gadnum ];
 		int item = gadValue[ gadnum ] + ( clickY - gadY[ gadnum ] - 6 ) / 16;
-		if( item == gadItem[ gadnum ] && time - gadRange[ gadnum ] < 500 )
+		if( item == gadItem[ gadnum ] && dt > 0 && dt < 500 )
 		{
 			action( gadTarget[ gadnum ] );
 			gadRange[ gadnum ] = 0;
@@ -1170,23 +1165,36 @@ patternData[ 3 ] = 0x40;
 					getDir( new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] ) );
 					break;
 				case GADNUM_LOAD_BUTTON:
-					File file = new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] );
-					if( gadItem[ GADNUM_DIR_LISTBOX ] > 0 )
+					if( gadValues[ GADNUM_DIR_LISTBOX ][ 0 ] == 0 )
 					{
-						file = new File( file, gadText[ GADNUM_DIR_LISTBOX ][ gadItem[ GADNUM_DIR_LISTBOX ] ].substring( 6 ) );
+						setInstrument( gadItem[ GADNUM_DIR_LISTBOX ] + 1 );
 					}
 					else
 					{
-						file = file.getParentFile();
+						File file = new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] );
+						if( gadItem[ GADNUM_DIR_LISTBOX ] > 0 )
+						{
+							file = new File( file, gadText[ GADNUM_DIR_LISTBOX ][ gadItem[ GADNUM_DIR_LISTBOX ] ].substring( 6 ) );
+							if( file.isDirectory() )
+							{
+								getDir( file );
+							}
+							else
+							{
+								load( file );
+							}
+						}
+						else
+						{
+							getDir( file.getParentFile() );
+						}
 					}
-					if( file.isDirectory() )
-					{
-						getDir( file );
-					}
-					else
-					{
-						load( file );
-					}
+					break;
+				case GADNUM_INST_INC_BUTTON:
+					setInstrument( instrument + 1 );
+					break;
+				case GADNUM_INST_DEC_BUTTON:
+					setInstrument( instrument - 1 );
 					break;
 				case GADNUM_SEQ_INS_BUTTON:
 					insertSeq();
@@ -1204,16 +1212,19 @@ patternData[ 3 ] = 0x40;
 		}
 	}
 	
-	private static String pad( String value, char chr, int len )
+	private static String pad( String value, char chr, int length, boolean left )
 	{
-		char[] chars = new char[ len ];
-		int offset = len - value.length();
-		for( int idx = 0; idx < offset; idx++ )
+		if( value.length() < length )
 		{
-			chars[ idx ] = chr;
+			char[] chars = new char[ length ];
+			for( int idx = 0; idx < chars.length; idx++ )
+			{
+				chars[ idx ] = chr;
+			}
+			value.getChars( 0, value.length(), chars, left ? length - value.length() : 0 );
+			return new String( chars );
 		}
-		value.getChars( 0, value.length(), chars, offset );
-		return new String( chars );
+		return value;
 	}
 	
 	private static String[] getFileNames( File[] files, String[] names )
@@ -1250,15 +1261,15 @@ patternData[ 3 ] = 0x40;
 					}
 					else if( size > 1024 * 9999 )
 					{
-						prefix = pad( Long.toString( size / 1048576 ), ' ', 4 ) + "m ";
+						prefix = pad( Long.toString( size / 1048576 ), ' ', 4, true ) + "m ";
 					}
 					else if( size > 9999 )
 					{
-						prefix = pad( Long.toString( size / 1024 ), ' ', 4 ) + "k ";
+						prefix = pad( Long.toString( size / 1024 ), ' ', 4, true ) + "k ";
 					}
 					else
 					{
-						prefix = pad( Long.toString( size ), ' ', 5 ) + " ";
+						prefix = pad( Long.toString( size ), ' ', 5, true ) + " ";
 					}
 					names[ len ] = prefix + file.getName();
 				}
@@ -1322,7 +1333,7 @@ patternData[ 3 ] = 0x40;
 		for( int idx = 0; idx < items.length; idx++ )
 		{
 			String pat = String.valueOf( sequence[ idx ] );
-			items[ idx ] = pad( String.valueOf( idx ), '0', 3 ) + ' ' + pad( pat, ' ', 3 );
+			items[ idx ] = pad( String.valueOf( idx ), '0', 3, true ) + ' ' + pad( pat, ' ', 3, true );
 		}
 		return items;
 	}
@@ -1362,6 +1373,43 @@ patternData[ 3 ] = 0x40;
 		}
 	}
 	
+	private void setInstrument( int idx )
+	{
+		if( idx < 1 )
+		{
+			idx = 1;
+		}
+		if( idx > 31 )
+		{
+			idx = 31;
+		}
+		instrument = idx;
+		String[] names = new String[ 31 ];
+		for( int ins = 1; ins <= names.length; ins++ )
+		{
+			String name = pad( modPlay3.getInstrumentName( ins ), ' ', 22, false );
+			String len = pad( String.valueOf( modPlay3.getSampleLength( ins ) ), ' ', 6, true );
+			names[ ins - 1 ] = pad( String.valueOf( ins ), '0', 2, true ) + ' ' + name + ' ' + len;
+		}
+		gadValues[ GADNUM_DIR_LISTBOX ] = new int[ names.length ];
+		gadItem[ GADNUM_DIR_LISTBOX ] = idx - 1;
+		gadText[ GADNUM_DIR_LISTBOX ] = names;
+		gadRedraw[ GADNUM_DIR_LISTBOX ] = true;
+		gadText[ GADNUM_INST_TEXTBOX ][ 0 ] = String.valueOf( instrument );
+		gadRedraw[ GADNUM_INST_TEXTBOX ] = true;
+		gadText[ GADNUM_INST_NAME_TEXTBOX ][ 0 ] = String.valueOf( modPlay3.getInstrumentName( idx ) );
+		gadRedraw[ GADNUM_INST_NAME_TEXTBOX ] = true;
+		gadText[ GADNUM_INST_REP_TEXTBOX ][ 0 ] = String.valueOf( modPlay3.getSampleLoopStart( idx ) );
+		gadRedraw[ GADNUM_INST_REP_TEXTBOX ] = true;
+		gadText[ GADNUM_INST_VOL_TEXTBOX ][ 0 ] = String.valueOf( modPlay3.getSampleVolume( idx ) );
+		gadRedraw[ GADNUM_INST_VOL_TEXTBOX ] = true;
+		gadText[ GADNUM_INST_LEN_TEXTBOX ][ 0 ] = String.valueOf( modPlay3.getSampleLoopLength( idx ) );
+		gadRedraw[ GADNUM_INST_LEN_TEXTBOX ] = true;
+		gadText[ GADNUM_INST_FINE_TEXTBOX ][ 0 ] = String.valueOf( modPlay3.getSampleFinetune( idx ) );
+		gadRedraw[ GADNUM_INST_FINE_TEXTBOX ] = true;
+		repaint();
+	}
+	
 	private void load( File file ) throws IOException
 	{
 		System.out.println( "Load " + file.getAbsolutePath() );
@@ -1391,7 +1439,8 @@ patternData[ 3 ] = 0x40;
 		gadText[ GADNUM_SEQ_LISTBOX ] = getSeqItems( modPlay3.getSequence() );
 		gadRedraw[ GADNUM_SEQ_LISTBOX ] = true;
 		gadRedraw[ GADNUM_PATTERN ] = true;
-		repaint();
+		gadValue[ GADNUM_DIR_SLIDER ] = 0;
+		setInstrument( 1 );
 	}
 	
 	public static void main( String[] args ) throws Exception

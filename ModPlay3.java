@@ -264,6 +264,32 @@ public class ModPlay3
 		return instrumentNames[ idx ];
 	}
 	
+	public int getSampleLength( int idx )
+	{
+		return sampleData[ idx ].length;
+	}
+	
+	public int getSampleVolume( int idx )
+	{
+		return sampleVolume[ idx ];
+	}
+	
+	public int getSampleFinetune( int idx )
+	{
+		int finetune = sampleFineTune[ idx ];
+		return finetune < 8 ? finetune : finetune - 16;
+	}
+	
+	public int getSampleLoopStart( int idx )
+	{
+		return sampleLoopStart[ idx ] >> FIXED_POINT_SHIFT;
+	}
+	
+	public int getSampleLoopLength( int idx )
+	{
+		return sampleLoopLength[ idx ] >> FIXED_POINT_SHIFT;
+	}
+	
 	public int getNumChannels()
 	{
 		return numChannels;
