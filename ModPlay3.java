@@ -259,9 +259,19 @@ public class ModPlay3
 		return songName;
 	}
 	
+	public void setSongName( String name )
+	{
+		songName = name.length() > 20 ? name.substring( 0, 20 ) : name;
+	}
+	
 	public String getInstrumentName( int idx )
 	{
 		return instrumentNames[ idx ];
+	}
+	
+	public void setInstrumentName( int idx, String name )
+	{
+		instrumentNames[ idx ] = name.length() > 22 ? name.substring( 0, 22 ) : name;
 	}
 	
 	public int getSampleLength( int idx )
@@ -274,10 +284,24 @@ public class ModPlay3
 		return sampleVolume[ idx ];
 	}
 	
+	public void setSampleVolume( int idx, int volume )
+	{
+		sampleVolume[ idx ] = ( volume < 0 || volume > 64 ) ? 64 : volume;
+	}
+	
 	public int getSampleFinetune( int idx )
 	{
 		int finetune = sampleFineTune[ idx ];
 		return finetune < 8 ? finetune : finetune - 16;
+	}
+	
+	public void setSampleFinetune( int idx, int finetune ) 
+	{
+		if( finetune < -8 || finetune > 7 )
+		{
+			finetune = 0;
+		}
+		sampleFineTune[ idx ] = finetune < 0 ? finetune + 16 : finetune;
 	}
 	
 	public int getSampleLoopStart( int idx )
@@ -288,6 +312,29 @@ public class ModPlay3
 	public int getSampleLoopLength( int idx )
 	{
 		return sampleLoopLength[ idx ] >> FIXED_POINT_SHIFT;
+	}
+	
+	public void setSampleLoop( int idx, int loopStart, int loopLength )
+	{
+		int sampleLength = sampleData[ idx ].length;
+		if( loopStart < 0 || loopLength < 4 || loopStart > sampleLength )
+		{
+			loopStart = sampleLength;
+			loopLength = 0;
+		}
+		if( loopStart + loopLength > sampleLength )
+		{
+			loopLength = sampleLength - loopStart;
+		}
+		sampleLoopStart[ idx ] = ( loopStart & -2 ) * FIXED_POINT_ONE;
+		sampleLoopLength[ idx ] = ( loopLength & -2 ) * FIXED_POINT_ONE;
+	}
+	
+	public void setSampleData( int idx, byte[] data )
+	{
+		sampleData[ idx ] = new byte[ ( data.length > 0x1FFFE ? 0x1FFFE : data.length ) & -2 ];
+		System.arraycopy( data, 0, sampleData[ idx ], 0, sampleData[ idx ].length );
+		setSampleLoop( idx, 0, 0 );
 	}
 	
 	public int getNumChannels()
