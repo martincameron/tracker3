@@ -122,6 +122,10 @@ public class ModPlay3
 			sampleLoopLength[ idx ] = loopLength * FIXED_POINT_ONE;
 		}
 		songLength = moduleData.read() & 0x7F;
+		if( songLength < 1 )
+		{
+			songLength = 1;
+		}
 		int restart = moduleData.read() & 0x7F;
 		int patterns = 0;
 		sequence = readBytes( moduleData, 128 );

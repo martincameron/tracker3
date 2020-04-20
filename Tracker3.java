@@ -1465,22 +1465,23 @@ modPlay3.setPatternData( patternData, 8 );
 		{
 			inputStream.close();
 		}
-		int channels = modPlay3.getNumChannels();
-		if( channels < 8 )
+		byte[] patternData = new byte[ 8 * 4 * 64 * 128 ];
+		int stride = modPlay3.getNumChannels() * 4;
+		int rows = modPlay3.getPatternData().length / stride;
+		for( int idx = 0; idx < rows; idx++ )
 		{
-			int stride = channels * 4;
-			byte[] patternData = new byte[ 8 * 4 * 64 * 128 ];
-			int rows = modPlay3.getPatternData().length / stride;
-			for( int idx = 0; idx < rows; idx++ )
-			{
-				System.arraycopy( modPlay3.getPatternData(), idx * stride, patternData, idx * 8 * 4, stride );
-			}
-			modPlay3.setPatternData( patternData, 8 );
+			System.arraycopy( modPlay3.getPatternData(), idx * stride, patternData, idx * 8 * 4, stride );
 		}
+		modPlay3.setPatternData( patternData, 8 );
 		gadText[ GADNUM_TITLE_TEXTBOX ][ 0 ] = modPlay3.getSongName();
 		gadRedraw[ GADNUM_TITLE_TEXTBOX ] = true;
-		gadText[ GADNUM_SEQ_LISTBOX ] = getSeqItems( modPlay3.getSequence() );
+		byte[] sequence = modPlay3.getSequence();
+		pattern = sequence[ 0 ];
+		gadText[ GADNUM_SEQ_TEXTBOX ][ 0 ] = String.valueOf( pattern );
+		gadRedraw[ GADNUM_SEQ_TEXTBOX ] = true;
+		gadText[ GADNUM_SEQ_LISTBOX ] = getSeqItems( sequence );
 		gadRedraw[ GADNUM_SEQ_LISTBOX ] = true;
+		gadValue[ GADNUM_PATTERN_SLIDER ] = 0;
 		gadRedraw[ GADNUM_PATTERN ] = true;
 		gadValue[ GADNUM_DIR_SLIDER ] = 0;
 		setInstrument( 1 );
