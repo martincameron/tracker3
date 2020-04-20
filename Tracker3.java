@@ -228,12 +228,11 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private int[] gadMax = new int[ GAD_COUNT ];
 	private int[] gadItem = new int[ GAD_COUNT ];
 	private int[] gadLink = new int[ GAD_COUNT ];
-	private int[] gadTarget = new int[ GAD_COUNT ];
 	
 	private Image charset, image;
 	
 	private ModPlay3 modPlay3 = new ModPlay3( 8 );
-	private int instrument;
+	private int instrument, pattern;
 	
 	private static Color toColor( int rgb12 )
 	{
@@ -256,9 +255,9 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private void createDiskGadgets( int x, int y )
 	{
 		int rows = 7, cols = 32;
-		createTextbox( GADNUM_DIR_TEXTBOX, x, y, ( cols - 1 ) * 8, 28, "", GADNUM_DIR_BUTTON );
+		createTextbox( GADNUM_DIR_TEXTBOX, x, y, ( cols - 1 ) * 8, 28, "" );
 		createButton( GADNUM_DIR_BUTTON, x + ( cols - 1 ) * 8 + 4, y + 2, 44, 24, "Dir" );
-		createListbox( GADNUM_DIR_LISTBOX, x, y + 32, ( cols + 2 ) * 8, rows * 16 + 12, GADNUM_DIR_SLIDER, GADNUM_LOAD_BUTTON );
+		createListbox( GADNUM_DIR_LISTBOX, x, y + 32, ( cols + 2 ) * 8, rows * 16 + 12, GADNUM_DIR_SLIDER );
 		createSlider( GADNUM_DIR_SLIDER, x + ( cols + 2 ) * 8 + 4, y + 32, 20, rows * 16 + 12, 1, 1 );
 		createButton( GADNUM_LOAD_BUTTON, x, y + rows * 16 + 48, 64, 24, "Load" );
 		createButton( GADNUM_SAVE_BUTTON, x + 64 + 4, y + rows * 16 + 48, 64, 24, "Save" );
@@ -267,28 +266,28 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private void createInstGadgets( int x, int y )
 	{
 		createLabel( GADNUM_INST_LABEL, x, y + 6, "Instrument", TEXT_SHADOW_SELECTED );
-		createTextbox( GADNUM_INST_TEXTBOX, x + 10 * 8 + 4, y, 4 * 8, 28, "00", 0 );
+		createTextbox( GADNUM_INST_TEXTBOX, x + 10 * 8 + 4, y, 4 * 8, 28, "00" );
 		createButton( GADNUM_INST_DEC_BUTTON, x + 15 * 8, y + 2, 24, 24, "<" );
 		createButton( GADNUM_INST_INC_BUTTON, x + 15 * 8 + 28, y + 2, 24, 24, ">" );
 		createLabel( GADNUM_INST_NAME_LABEL, x, y + 32 + 6, "Name", TEXT_SHADOW_SELECTED );
-		createTextbox( GADNUM_INST_NAME_TEXTBOX, x + 4 * 8 + 4, y + 32, 24 * 8, 28, "[001 C-2 C#D#EF#G#A#B]", 0 );
+		createTextbox( GADNUM_INST_NAME_TEXTBOX, x + 4 * 8 + 4, y + 32, 24 * 8, 28, "[001 C-2 C#D#EF#G#A#B]" );
 		createLabel( GADNUM_INST_REP_LABEL, x, y + 32 * 2 + 6, "Repeat", TEXT_SHADOW_SELECTED );
-		createTextbox( GADNUM_INST_REP_TEXTBOX, x + 6 * 8 + 4, y + 32 * 2, 8 * 8, 28, "999999", 0 );
+		createTextbox( GADNUM_INST_REP_TEXTBOX, x + 6 * 8 + 4, y + 32 * 2, 8 * 8, 28, "999999" );
 		createLabel( GADNUM_INST_VOL_LABEL, x + 16 * 8, y + 32 * 2 + 6, "Volume", TEXT_SHADOW_SELECTED );
-		createTextbox( GADNUM_INST_VOL_TEXTBOX, x + 24 * 8 + 4, y + 32 * 2, 4 * 8, 28, "64", 0 );
+		createTextbox( GADNUM_INST_VOL_TEXTBOX, x + 24 * 8 + 4, y + 32 * 2, 4 * 8, 28, "64" );
 		createLabel( GADNUM_INST_LEN_LABEL, x, y + 32 * 3 + 6, "Length", TEXT_SHADOW_SELECTED );
-		createTextbox( GADNUM_INST_LEN_TEXTBOX, x + 6 * 8 + 4, y + 32 * 3, 8 * 8, 28, "999999", 0 );
+		createTextbox( GADNUM_INST_LEN_TEXTBOX, x + 6 * 8 + 4, y + 32 * 3, 8 * 8, 28, "999999" );
 		createLabel( GADNUM_INST_FINE_LABEL, x + 16 * 8, y + 32 * 3 + 6, "Finetune", TEXT_SHADOW_SELECTED );
-		createTextbox( GADNUM_INST_FINE_TEXTBOX, x + 24 * 8 + 4, y + 32 * 3, 4 * 8, 28, "-8", 0 );
+		createTextbox( GADNUM_INST_FINE_TEXTBOX, x + 24 * 8 + 4, y + 32 * 3, 4 * 8, 28, "-8" );
 	}
 	
 	private void createSequenceGadgets( int x, int y )
 	{
 		int rows = 7;
-		createTextbox( GADNUM_SEQ_TEXTBOX, x, y, 5 * 8, 28, "0", 0 );
+		createTextbox( GADNUM_SEQ_TEXTBOX, x, y, 5 * 8, 28, "0" );
 		createButton( GADNUM_SEQ_INS_BUTTON, x + 5 * 8 + 4, y + 2, 3 * 8, 24, "+" );
 		createButton( GADNUM_SEQ_DEL_BUTTON, x + 9 * 8, y + 2, 3 * 8, 24, "-" );
-		createListbox( GADNUM_SEQ_LISTBOX, x, y + 32, 9 * 8, rows * 16 + 12, GADNUM_SEQ_SLIDER, 0 );
+		createListbox( GADNUM_SEQ_LISTBOX, x, y + 32, 9 * 8, rows * 16 + 12, GADNUM_SEQ_SLIDER );
 		gadText[ GADNUM_SEQ_LISTBOX ] = new String[] { "000   0" };
 		createSlider( GADNUM_SEQ_SLIDER, x + 9 * 8 + 4, y + 32, 20, rows * 16 + 12, 1, 1 );
 	}
@@ -305,7 +304,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		createSlider( GADNUM_PATTERN_SLIDER, 616, 192, 20, 256, 15, 78 );
 		createDiskGadgets( 4, 4 );
 		createLabel( GADNUM_TITLE_LABEL, 306, 10, "Title", TEXT_SHADOW_SELECTED );
-		createTextbox( GADNUM_TITLE_TEXTBOX, 306 + 5 * 8 + 4, 4, 23 * 8, 28, "", 0 );
+		createTextbox( GADNUM_TITLE_TEXTBOX, 306 + 5 * 8 + 4, 4, 23 * 8, 28, "" );
 		createInstGadgets( 306, 36 );
 		createSequenceGadgets( 540, 4 );
 		createLabel( GADNUM_VER_LABEL, 200, 6 + 7 * 16 + 50, VERSION, TEXT_HIGHLIGHT_SELECTED );
@@ -316,11 +315,12 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 
 		gadRedraw[ 0 ] = true;
 
-byte[] patternData = modPlay3.getPatternData();
+byte[] patternData = new byte[ 8 * 4 * 64 * 128 ];
 patternData[ 0 ] = 0x01;
 patternData[ 1 ] = 0x1F;
 patternData[ 2 ] = 0x0C;
 patternData[ 3 ] = 0x40;
+modPlay3.setPatternData( patternData, 8 );
 	}
 	
 	public void keyPressed( KeyEvent e )
@@ -511,7 +511,7 @@ patternData[ 3 ] = 0x40;
 								drawListbox( imageGraphics, idx );
 								break;
 							case GAD_TYPE_PATTERN:
-								drawPattern( imageGraphics, idx, 0 );
+								drawPattern( imageGraphics, idx, pattern );
 								break;
 						}
 						gadRedraw[ idx ] = false;
@@ -741,6 +741,8 @@ patternData[ 3 ] = 0x40;
 				}
 				break;
 			case KEY_ESCAPE:
+				escape( gadnum );
+				text = gadText[ gadnum ][ 0 ];
 				focus = 0;
 				break;
 			case KEY_HOME:
@@ -769,7 +771,8 @@ patternData[ 3 ] = 0x40;
 			default:
 				if( chr == 10 )
 				{
-					action( gadTarget[ gadnum ] );
+					action( gadnum );
+					text = gadText[ gadnum ][ 0 ];
 					focus = 0;
 				}
 				else if( chr >= 32 && chr < 127 )
@@ -788,7 +791,6 @@ patternData[ 3 ] = 0x40;
 		gadValue[ gadnum ] = offset;
 		gadItem[ gadnum ] = cursor;
 		gadRedraw[ gadnum ] = true;
-		action( gadnum );
 		repaint();
 	}
 	
@@ -925,7 +927,7 @@ patternData[ 3 ] = 0x40;
 		int item = gadValue[ gadnum ] + ( clickY - gadY[ gadnum ] - 6 ) / 16;
 		if( item == gadItem[ gadnum ] && dt > 0 && dt < 500 )
 		{
-			action( gadTarget[ gadnum ] );
+			action( gadnum );
 			gadRange[ gadnum ] = 0;
 		}
 		else
@@ -934,11 +936,10 @@ patternData[ 3 ] = 0x40;
 			{
 				gadItem[ gadnum ] = item;
 			}
-			action( gadnum );
 			gadRange[ gadnum ] = time;
 			gadRedraw[ gadnum ] = true;
-			repaint();
 		}
+		repaint();
 	}
 	
 	private void keyListbox( int gadnum, char chr, int key )
@@ -974,7 +975,7 @@ patternData[ 3 ] = 0x40;
 			default:
 				if( chr == 10 )
 				{
-					action( gadTarget[ gadnum ] );
+					action( gadnum );
 				}
 				break;
 		}
@@ -1125,11 +1126,10 @@ patternData[ 3 ] = 0x40;
 		gadText[ gadnum ] = new String[] { text };
 	}
 	
-	private void createTextbox( int gadnum, int x, int y, int w, int h, String text, int target )
+	private void createTextbox( int gadnum, int x, int y, int w, int h, String text )
 	{
 		createGadget( gadnum, GAD_TYPE_TEXTBOX, x, y, w, h );
 		gadText[ gadnum ] = new String[] { text };
-		gadTarget[ gadnum ] = target;
 	}
 	
 	private void createSlider( int gadnum, int x, int y, int w, int h, int range, int max )
@@ -1140,12 +1140,11 @@ patternData[ 3 ] = 0x40;
 		gadMax[ gadnum ] = max;
 	}
 	
-	private void createListbox( int gadnum, int x, int y, int w, int h, int slider, int target )
+	private void createListbox( int gadnum, int x, int y, int w, int h, int slider )
 	{
 		createGadget( gadnum, GAD_TYPE_LISTBOX, x, y, w, h );
 		gadLink[ gadnum ] = slider;
 		gadLink[ slider ] = gadnum;
-		gadTarget[ gadnum ] = target;
 	}
 	
 	private void createPattern( int gadnum, int x, int y, int slider )
@@ -1155,6 +1154,10 @@ patternData[ 3 ] = 0x40;
 		gadLink[ slider ] = gadnum;
 	}
 	
+	private void escape( int gadnum )
+	{
+	}
+	
 	private void action( int gadnum )
 	{
 		try
@@ -1162,9 +1165,11 @@ patternData[ 3 ] = 0x40;
 			switch( gadnum ) 
 			{
 				case GADNUM_DIR_BUTTON:
+				case GADNUM_DIR_TEXTBOX:
 					getDir( new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] ) );
 					break;
 				case GADNUM_LOAD_BUTTON:
+				case GADNUM_DIR_LISTBOX:
 					if( gadValues[ GADNUM_DIR_LISTBOX ][ 0 ] == 0 )
 					{
 						setInstrument( gadItem[ GADNUM_DIR_LISTBOX ] + 1 );
@@ -1190,11 +1195,53 @@ patternData[ 3 ] = 0x40;
 						}
 					}
 					break;
+				case GADNUM_TITLE_TEXTBOX:
+					modPlay3.setSongName( gadText[ gadnum ][ 0 ] );
+					gadText[ gadnum ][ 0 ] = modPlay3.getSongName();
+					break;
 				case GADNUM_INST_INC_BUTTON:
 					setInstrument( instrument + 1 );
 					break;
 				case GADNUM_INST_DEC_BUTTON:
 					setInstrument( instrument - 1 );
+					break;
+				case GADNUM_INST_NAME_TEXTBOX:
+					modPlay3.setInstrumentName( instrument, gadText[ gadnum ][ 0 ] );
+					setInstrument( instrument );
+					break;
+				case GADNUM_INST_REP_TEXTBOX:
+					int rep = parsePositiveInt( gadText[ gadnum ][ 0 ], 0x1FFFE );
+					modPlay3.setSampleLoop( instrument, rep, modPlay3.getSampleLoopLength( instrument ) );
+					setInstrument( instrument );
+					break;
+				case GADNUM_INST_VOL_TEXTBOX:
+					modPlay3.setSampleVolume( instrument, parsePositiveInt( gadText[ gadnum ][ 0 ], 64 ) );
+					setInstrument( instrument );
+					break;
+				case GADNUM_INST_LEN_TEXTBOX:
+					int len = parsePositiveInt( gadText[ gadnum ][ 0 ], 0x1FFFE );
+					modPlay3.setSampleLoop( instrument, modPlay3.getSampleLoopStart( instrument ), len );
+					setInstrument( instrument );
+					break;
+				case GADNUM_INST_FINE_TEXTBOX:
+					int fine = parsePositiveInt( gadText[ gadnum ][ 0 ], 8 );
+					if( fine > 0 && gadText[ gadnum ][ 0 ].charAt( 0 ) == '-' )
+					{
+						fine = -fine;
+					}
+					modPlay3.setSampleFinetune( instrument, fine );
+					setInstrument( instrument );
+					break;
+				case GADNUM_SEQ_TEXTBOX:
+					pattern = parsePositiveInt( gadText[ gadnum ][ 0 ], 127 );
+					gadText[ gadnum ][ 0 ] = String.valueOf( pattern );
+					gadRedraw[ GADNUM_PATTERN ] = true;
+					break;
+				case GADNUM_SEQ_LISTBOX:
+					pattern = parsePositiveInt( gadText[ gadnum ][ gadItem[ gadnum ] ].substring( 4 ), 127 );
+					gadText[ GADNUM_SEQ_TEXTBOX ][ 0 ] = String.valueOf( pattern );
+					gadRedraw[ GADNUM_SEQ_TEXTBOX ] = true;
+					gadRedraw[ GADNUM_PATTERN ] = true;
 					break;
 				case GADNUM_SEQ_INS_BUTTON:
 					insertSeq();
@@ -1300,7 +1347,6 @@ patternData[ 3 ] = 0x40;
 		gadValues[ GADNUM_DIR_LISTBOX ] = values;
 		gadRedraw[ GADNUM_DIR_TEXTBOX ] = true;
 		gadRedraw[ GADNUM_DIR_LISTBOX ] = true;
-		repaint();
 	}
 	
 	private static int parsePositiveInt( String str, int max )
@@ -1350,7 +1396,6 @@ patternData[ 3 ] = 0x40;
 			System.arraycopy( sequence, item + 1, seqNew, item + 2, sequence.length - item - 1 );
 			gadText[ GADNUM_SEQ_LISTBOX ] = getSeqItems( seqNew );
 			gadRedraw[ GADNUM_SEQ_LISTBOX ] = true;
-			repaint();
 		}
 	}
 	
@@ -1369,7 +1414,6 @@ patternData[ 3 ] = 0x40;
 				gadItem[ GADNUM_SEQ_LISTBOX ] = seqNew.length - 1;
 			}
 			gadRedraw[ GADNUM_SEQ_LISTBOX ] = true;
-			repaint();
 		}
 	}
 	
@@ -1407,7 +1451,6 @@ patternData[ 3 ] = 0x40;
 		gadRedraw[ GADNUM_INST_LEN_TEXTBOX ] = true;
 		gadText[ GADNUM_INST_FINE_TEXTBOX ][ 0 ] = String.valueOf( modPlay3.getSampleFinetune( idx ) );
 		gadRedraw[ GADNUM_INST_FINE_TEXTBOX ] = true;
-		repaint();
 	}
 	
 	private void load( File file ) throws IOException

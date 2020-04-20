@@ -317,12 +317,11 @@ public class ModPlay3
 	public void setSampleLoop( int idx, int loopStart, int loopLength )
 	{
 		int sampleLength = sampleData[ idx ].length;
-		if( loopStart < 0 || loopLength < 4 || loopStart > sampleLength )
+		if( loopStart < 0 || loopStart > sampleLength )
 		{
 			loopStart = sampleLength;
-			loopLength = 0;
 		}
-		if( loopStart + loopLength > sampleLength )
+		if( loopLength < 4 || loopStart + loopLength > sampleLength )
 		{
 			loopLength = sampleLength - loopStart;
 		}
