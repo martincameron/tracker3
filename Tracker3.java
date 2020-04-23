@@ -232,7 +232,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private Image charset, image;
 	
 	private ModPlay3 modPlay3 = new ModPlay3( 8 );
-	private int instrument, pattern;
+	private int instrument;
 	
 	private static Color toColor( int rgb12 )
 	{
@@ -511,7 +511,7 @@ modPlay3.setPatternData( patternData, 8 );
 								drawListbox( imageGraphics, idx );
 								break;
 							case GAD_TYPE_PATTERN:
-								drawPattern( imageGraphics, idx, pattern );
+								drawPattern( imageGraphics, idx );
 								break;
 						}
 						gadRedraw[ idx ] = false;
@@ -1004,9 +1004,8 @@ modPlay3.setPatternData( patternData, 8 );
 		gadValue[ listbox ] = gadValue[ slider ];
 	}
 	
-	private String getNote( int pat, int row, int channel )
+	private static String getNote( byte[] patternData, int pat, int row, int channel )
 	{
-		byte[] patternData = modPlay3.getPatternData();
 		int offset = ( ( pat * 64 + row ) * 8 + channel ) * 4;
 		int key = patternData[ offset ] & 0xFF;
 		int instrument = patternData[ offset + 1 ] & 0xFF;
@@ -1024,8 +1023,10 @@ modPlay3.setPatternData( patternData, 8 );
 		return new String( chars );
 	}
 	
-	private void drawPattern( Graphics g, int gadnum, int pat )
+	private void drawPattern( Graphics g, int gadnum )
 	{
+		byte[] patternData = modPlay3.getPatternData();
+		int pat = modPlay3.getPattern( getSeqPos() );
 		int x = gadX[ gadnum ];
 		int y = gadY[ gadnum ];
 		if( gadLink[ gadnum ] > 0 )
@@ -1059,7 +1060,7 @@ modPlay3.setPatternData( patternData, 8 );
 				drawInt( g, x + 8, y + r * 16, dr, 2, TEXT_BLUE + hl );
 				for( int c = 0; c < 8; c++ )
 				{
-					String note = getNote( pat, dr, c );
+					String note = getNote( patternData, pat, dr, c );
 					int clr = note.charAt( 0 ) == '-' ? TEXT_BLUE : TEXT_CYAN;
 					drawText( g, x + ( c * 9 + 4 ) * 8, y + r * 16, note.substring( 0, 3 ), clr + hl );
 					clr = note.charAt( 3 ) == '-' ? TEXT_BLUE : TEXT_RED;
@@ -1232,16 +1233,8 @@ modPlay3.setPatternData( patternData, 8 );
 					modPlay3.setSampleFinetune( instrument, fine );
 					setInstrument( instrument );
 					break;
-				case GADNUM_SEQ_TEXTBOX:
-					pattern = parsePositiveInt( gadText[ gadnum ][ 0 ], 127 );
-					gadText[ gadnum ][ 0 ] = String.valueOf( pattern );
-					gadRedraw[ GADNUM_PATTERN ] = true;
-					break;
 				case GADNUM_SEQ_LISTBOX:
-					pattern = parsePositiveInt( gadText[ gadnum ][ gadItem[ gadnum ] ].substring( 4 ), 127 );
-					gadText[ GADNUM_SEQ_TEXTBOX ][ 0 ] = String.valueOf( pattern );
-					gadRedraw[ GADNUM_SEQ_TEXTBOX ] = true;
-					gadRedraw[ GADNUM_PATTERN ] = true;
+					setSeqPos( gadItem[ gadnum ] );
 					break;
 				case GADNUM_SEQ_INS_BUTTON:
 					insertSeq();
@@ -1363,17 +1356,7 @@ modPlay3.setPatternData( patternData, 8 );
 		return value > max ? max : value;
 	}
 	
-	private static byte[] getSequence( String[] items )
-	{
-		byte[] sequence = new byte[ items.length ];
-		for( int idx = 0; idx < items.length; idx++ )
-		{
-			sequence[ idx ] = ( byte ) parsePositiveInt( items[ idx ].substring( 4, 7 ), 127 );
-		}
-		return sequence;
-	}
-	
-	private static String[] getSeqItems( byte[] sequence )
+	private void setSequence( byte[] sequence )
 	{
 		String[] items = new String[ sequence.length ];
 		for( int idx = 0; idx < items.length; idx++ )
@@ -1381,40 +1364,67 @@ modPlay3.setPatternData( patternData, 8 );
 			String pat = String.valueOf( sequence[ idx ] );
 			items[ idx ] = pad( String.valueOf( idx ), '0', 3, true ) + ' ' + pad( pat, ' ', 3, true );
 		}
-		return items;
+		gadText[ GADNUM_SEQ_LISTBOX ] = items;
+		modPlay3.setSequence( sequence );
+		int seqPos = getSeqPos();
+		if( seqPos >= sequence.length )
+		{
+			seqPos = sequence.length - 1;
+		}
+		setSeqPos( seqPos );
 	}
 	
 	private void insertSeq()
 	{
-		byte[] sequence = getSequence( gadText[ GADNUM_SEQ_LISTBOX ] );
-		if( sequence.length < 127 )
+		int songLength = modPlay3.getSongLength();
+		if( songLength < 127 )
 		{
-			byte[] seqNew = new byte[ sequence.length + 1 ];
-			int item = gadItem[ GADNUM_SEQ_LISTBOX ];
-			System.arraycopy( sequence, 0, seqNew, 0, item + 1 );
-			seqNew[ item + 1 ] = ( byte ) parsePositiveInt( gadText[ GADNUM_SEQ_TEXTBOX ][ 0 ], 127 );
-			System.arraycopy( sequence, item + 1, seqNew, item + 2, sequence.length - item - 1 );
-			gadText[ GADNUM_SEQ_LISTBOX ] = getSeqItems( seqNew );
-			gadRedraw[ GADNUM_SEQ_LISTBOX ] = true;
+			byte[] sequence = new byte[ songLength + 1 ];
+			int seqPos = gadItem[ GADNUM_SEQ_LISTBOX ];
+			for( int idx = 0; idx <= seqPos; idx++ )
+			{
+				sequence[ idx ] = ( byte ) modPlay3.getPattern( idx );
+			}
+			sequence[ seqPos + 1 ] = ( byte ) parsePositiveInt( gadText[ GADNUM_SEQ_TEXTBOX ][ 0 ], 127 );
+			for( int idx = seqPos + 2; idx < sequence.length; idx++ )
+			{
+				sequence[ idx ] = ( byte ) modPlay3.getPattern( idx - 1 );
+			}
+			setSequence( sequence );
 		}
 	}
 	
 	private void deleteSeq()
 	{
-		byte[] sequence = getSequence( gadText[ GADNUM_SEQ_LISTBOX ] );
-		if( sequence.length > 1 )
+		int songLength = modPlay3.getSongLength();
+		if( songLength > 1 )
 		{
-			byte[] seqNew = new byte[ sequence.length - 1 ];
-			int item = gadItem[ GADNUM_SEQ_LISTBOX ];
-			System.arraycopy( sequence, 0, seqNew, 0, item );
-			System.arraycopy( sequence, item + 1, seqNew, item, sequence.length - item - 1 );
-			gadText[ GADNUM_SEQ_LISTBOX ] = getSeqItems( seqNew );
-			if( item >= seqNew.length )
+			byte[] sequence = new byte[ songLength - 1 ];
+			int seqPos = gadItem[ GADNUM_SEQ_LISTBOX ];
+			for( int idx = 0; idx < seqPos; idx++ )
 			{
-				gadItem[ GADNUM_SEQ_LISTBOX ] = seqNew.length - 1;
+				sequence[ idx ] = ( byte ) modPlay3.getPattern( idx );
 			}
-			gadRedraw[ GADNUM_SEQ_LISTBOX ] = true;
+			for( int idx = seqPos; idx < sequence.length; idx++ )
+			{
+				sequence[ idx ] = ( byte ) modPlay3.getPattern( idx + 1 );
+			}
+			setSequence( sequence );
 		}
+	}
+	
+	private int getSeqPos()
+	{
+		return gadItem[ GADNUM_SEQ_LISTBOX ];
+	}
+	
+	private void setSeqPos( int pos )
+	{
+		gadText[ GADNUM_SEQ_TEXTBOX ][ 0 ] = String.valueOf( modPlay3.getPattern( pos ) );
+		gadItem[ GADNUM_SEQ_LISTBOX ] = pos;
+		gadRedraw[ GADNUM_SEQ_TEXTBOX ] = true;
+		gadRedraw[ GADNUM_SEQ_LISTBOX ] = true;
+		gadRedraw[ GADNUM_PATTERN ] = true;
 	}
 	
 	private void setInstrument( int idx )
@@ -1475,12 +1485,13 @@ modPlay3.setPatternData( patternData, 8 );
 		modPlay3.setPatternData( patternData, 8 );
 		gadText[ GADNUM_TITLE_TEXTBOX ][ 0 ] = modPlay3.getSongName();
 		gadRedraw[ GADNUM_TITLE_TEXTBOX ] = true;
-		byte[] sequence = modPlay3.getSequence();
-		pattern = sequence[ 0 ];
-		gadText[ GADNUM_SEQ_TEXTBOX ][ 0 ] = String.valueOf( pattern );
-		gadRedraw[ GADNUM_SEQ_TEXTBOX ] = true;
-		gadText[ GADNUM_SEQ_LISTBOX ] = getSeqItems( sequence );
-		gadRedraw[ GADNUM_SEQ_LISTBOX ] = true;
+		setSeqPos( 0 );
+		byte[] sequence = new byte[ modPlay3.getSongLength() ];
+		for( int seqPos = 0; seqPos < sequence.length; seqPos++ )
+		{
+			sequence[ seqPos ] = ( byte ) modPlay3.getPattern( seqPos );
+		}
+		setSequence( sequence );
 		gadValue[ GADNUM_PATTERN_SLIDER ] = 0;
 		gadRedraw[ GADNUM_PATTERN ] = true;
 		gadValue[ GADNUM_DIR_SLIDER ] = 0;
