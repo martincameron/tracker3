@@ -463,9 +463,19 @@ public class ModPlay3
 		}
 	}
 	
+	public synchronized int getMute()
+	{
+		return mute;
+	}
+	
 	public synchronized void setMute( int bitmask )
 	{
 		mute = bitmask;
+	}
+	
+	public synchronized boolean getSequencer()
+	{
+		return sequencerEnabled;
 	}
 	
 	public synchronized void setSequencer( boolean enabled )
@@ -479,7 +489,6 @@ public class ModPlay3
 		{
 			channelInstrument[ channel ] = instrument;
 			channelPeriod[ channel ] = keyToPeriod( key, sampleFineTune[ instrument ] );
-			channelVolume[ channel ] = volume;
 			channelSamplePos[ channel ] = 0;
 		}
 		channelVolume[ channel ] = volume;
@@ -1046,23 +1055,54 @@ public class ModPlay3
 		return new String( bytes, 0, length, "ISO-8859-1" );
 	}
 	
-	private static void downsample( int[] buf, int count )
+	private static void writeAscii( String text, byte[] outBuf, int offset, int len )
+	{
+		for( int idx = 0; idx < len; idx++ )
+		{
+			outBuf[ offset + idx ] = ( byte ) ( idx < text.length() ? text.charAt( idx ) : 32 );
+		}
+	}
+	
+	private static void clear( int[] array )
+	{
+		for( int idx = 0; idx < array.length; idx++ )
+		{
+			array[ idx ] = 0;
+		}
+	}
+	
+	public static String pad( String string, char chr, int length, boolean left )
+	{
+		if( string.length() < length )
+		{
+			char[] chars = new char[ length ];
+			for( int idx = 0; idx < chars.length; idx++ )
+			{
+				chars[ idx ] = chr;
+			}
+			string.getChars( 0, string.length(), chars, left ? length - string.length() : 0 );
+			return new String( chars );
+		}
+		return string;
+	}
+	
+	public static void downsample( int[] buf, int count, int[] coeffs )
 	{
 		for( int idx = 0; idx < count; idx++ )
 		{
 			int lamp = 0;
 			int ramp = 0;
-			for( int coef = 0; coef < FILTER_COEFFS.length; coef++ )
+			for( int coef = 0; coef < coeffs.length; coef++ )
 			{
-				lamp += ( buf[ idx * 4 + coef * 2 ] * FILTER_COEFFS[ coef ] ) >> FIXED_POINT_SHIFT;
-				ramp += ( buf[ idx * 4 + coef * 2 + 1 ] * FILTER_COEFFS[ coef ] ) >> FIXED_POINT_SHIFT;
+				lamp += ( buf[ idx * 4 + coef * 2 ] * coeffs[ coef ] ) >> FIXED_POINT_SHIFT;
+				ramp += ( buf[ idx * 4 + coef * 2 + 1 ] * coeffs[ coef ] ) >> FIXED_POINT_SHIFT;
 			}
 			buf[ idx * 2 ] = lamp;
 			buf[ idx * 2 + 1 ] = ramp;
 		}
 	}
 	
-	private static int reverb( int[] buf, int[] reverbBuf, int reverbIdx, int count )
+	public static int reverb( int[] buf, int[] reverbBuf, int reverbIdx, int count )
 	{
 		for( int idx = 0; idx < count; idx++ )
 		{
@@ -1079,34 +1119,21 @@ public class ModPlay3
 		return reverbIdx;
 	}
 	
-	private static String pad( String string, int length, char chr, boolean left )
+	public static void clip( int[] inputBuf, byte[] outputBuf, int count )
 	{
-		if( string.length() < length )
+		for( int idx = 0; idx < count; idx++ )
 		{
-			char[] chars = new char[ length ];
-			for( int idx = 0; idx < chars.length; idx++ )
+			int ampl = inputBuf[ idx ];
+			if( ampl > 32767 )
 			{
-				chars[ idx ] = chr;
+				ampl = 32767;
 			}
-			string.getChars( 0, string.length(), chars, left ? length - string.length() : 0 );
-			return new String( chars );
-		}
-		return string;
-	}
-	
-	private static void clear( int[] array )
-	{
-		for( int idx = 0; idx < array.length; idx++ )
-		{
-			array[ idx ] = 0;
-		}
-	}
-	
-	private static void writeAscii( String text, byte[] outBuf, int offset, int len )
-	{
-		for( int idx = 0; idx < len; idx++ )
-		{
-			outBuf[ offset + idx ] = ( byte ) ( idx < text.length() ? text.charAt( idx ) : 32 );
+			if( ampl < -32768 )
+			{
+				ampl = -32768;
+			}
+			outputBuf[ idx * 2 ] = ( byte ) ampl;
+			outputBuf[ idx * 2 + 1 ] = ( byte ) ( ampl >> 8 );
 		}
 	}
 	
@@ -1141,16 +1168,16 @@ public class ModPlay3
 			}
 		}
 		System.out.println( "ModPlay3 (C)2020 Martin Cameron!" );
-		System.out.println( "Playing: " + pad( modPlay3.songName, 20, ' ', false ) + " Len   Loop" );
+		System.out.println( "Playing: " + pad( modPlay3.songName, ' ', 20, false ) + " Len   Loop" );
 		for( int idx = 1; idx < MAX_SAMPLES && modPlay3.instrumentNames[ idx ] != null; idx++ )
 		{
 			if( modPlay3.sampleData[ idx ].length > 0 || modPlay3.instrumentNames[ idx ].length() > 0 )
 			{
 				int loop = modPlay3.sampleLoopLength[ idx ] >> FIXED_POINT_SHIFT;
 				int len = ( modPlay3.sampleLoopStart[ idx ] >> FIXED_POINT_SHIFT ) + loop;
-				System.out.println( pad( String.valueOf( idx ), 2, '0', true ) + ' '
-					+ pad( modPlay3.instrumentNames[ idx ], 23, ' ', false )
-					+ pad( String.valueOf( len ), 7, ' ', true ) + pad( String.valueOf( loop ), 7, ' ', true ) );
+				System.out.println( pad( String.valueOf( idx ), '0', 2, true ) + ' '
+					+ pad( modPlay3.instrumentNames[ idx ], ' ', 23, false )
+					+ pad( String.valueOf( len ), ' ', 7, true ) + pad( String.valueOf( loop ), ' ', 7, true ) );
 			}
 		}
 		javax.sound.sampled.AudioFormat audioFormat = new javax.sound.sampled.AudioFormat( SAMPLING_RATE, 16, 2, true, false );
@@ -1186,22 +1213,9 @@ public class ModPlay3
 				mixIdx += count;
 				offset += count;
 			}
-			downsample( downsampleBuf, DOWNSAMPLE_BUF_SAMPLES / 2 );
+			downsample( downsampleBuf, DOWNSAMPLE_BUF_SAMPLES / 2, FILTER_COEFFS );
 			reverbIdx = reverb( downsampleBuf, reverbBuf, reverbIdx, DOWNSAMPLE_BUF_SAMPLES / 2 );
-			for( int idx = 0; idx < DOWNSAMPLE_BUF_SAMPLES; idx++ )
-			{
-				int ampl = downsampleBuf[ idx ];
-				if( ampl > 32767 )
-				{
-					ampl = 32767;
-				}
-				if( ampl < -32768 )
-				{
-					ampl = -32768;
-				}
-				outBuf[ idx * 2 ] = ( byte ) ampl;
-				outBuf[ idx * 2 + 1 ] = ( byte ) ( ampl >> 8 );
-			}
+			clip( downsampleBuf, outBuf, DOWNSAMPLE_BUF_SAMPLES );
 			sourceDataLine.write( outBuf, 0, DOWNSAMPLE_BUF_SAMPLES * 2 );
 		}
 	}

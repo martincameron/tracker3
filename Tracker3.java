@@ -312,6 +312,8 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 
 		getDir( null );
 		setInstrument( 1 );
+		
+		modPlay3.setSequencer( false );
 
 		gadRedraw[ 0 ] = true;
 
@@ -1242,6 +1244,13 @@ modPlay3.setPatternData( patternData, 8 );
 				case GADNUM_SEQ_DEL_BUTTON:
 					deleteSeq();
 					break;
+				case GADNUM_PLAY_BUTTON:
+					synchronized( modPlay3 )
+					{
+						modPlay3.setSequencer( true );
+						modPlay3.setSequencePos( getSeqPos(), getRow() );
+					}
+					break;
 				default:
 					System.out.println( gadnum );
 			}
@@ -1250,21 +1259,6 @@ modPlay3.setPatternData( patternData, 8 );
 		{
 			e.printStackTrace();
 		}
-	}
-	
-	private static String pad( String value, char chr, int length, boolean left )
-	{
-		if( value.length() < length )
-		{
-			char[] chars = new char[ length ];
-			for( int idx = 0; idx < chars.length; idx++ )
-			{
-				chars[ idx ] = chr;
-			}
-			value.getChars( 0, value.length(), chars, left ? length - value.length() : 0 );
-			return new String( chars );
-		}
-		return value;
 	}
 	
 	private static String[] getFileNames( File[] files, String[] names )
@@ -1301,15 +1295,15 @@ modPlay3.setPatternData( patternData, 8 );
 					}
 					else if( size > 1024 * 9999 )
 					{
-						prefix = pad( Long.toString( size / 1048576 ), ' ', 4, true ) + "m ";
+						prefix = ModPlay3.pad( Long.toString( size / 1048576 ), ' ', 4, true ) + "m ";
 					}
 					else if( size > 9999 )
 					{
-						prefix = pad( Long.toString( size / 1024 ), ' ', 4, true ) + "k ";
+						prefix = ModPlay3.pad( Long.toString( size / 1024 ), ' ', 4, true ) + "k ";
 					}
 					else
 					{
-						prefix = pad( Long.toString( size ), ' ', 5, true ) + " ";
+						prefix = ModPlay3.pad( Long.toString( size ), ' ', 5, true ) + " ";
 					}
 					names[ len ] = prefix + file.getName();
 				}
@@ -1362,7 +1356,8 @@ modPlay3.setPatternData( patternData, 8 );
 		for( int idx = 0; idx < items.length; idx++ )
 		{
 			String pat = String.valueOf( sequence[ idx ] );
-			items[ idx ] = pad( String.valueOf( idx ), '0', 3, true ) + ' ' + pad( pat, ' ', 3, true );
+			items[ idx ] = ModPlay3.pad( String.valueOf( idx ), '0', 3, true )
+				+ ' ' + ModPlay3.pad( pat, ' ', 3, true );
 		}
 		gadText[ GADNUM_SEQ_LISTBOX ] = items;
 		modPlay3.setSequence( sequence );
@@ -1413,6 +1408,17 @@ modPlay3.setPatternData( patternData, 8 );
 		}
 	}
 	
+	private int getRow()
+	{
+		return gadValue[ GADNUM_PATTERN_SLIDER ];
+	}
+	
+	private void setRow( int row )
+	{
+		gadValue[ GADNUM_PATTERN_SLIDER ] = row;
+		gadRedraw[ GADNUM_PATTERN ] = true;
+	}
+	
 	private int getSeqPos()
 	{
 		return gadItem[ GADNUM_SEQ_LISTBOX ];
@@ -1441,9 +1447,9 @@ modPlay3.setPatternData( patternData, 8 );
 		String[] names = new String[ 31 ];
 		for( int ins = 1; ins <= names.length; ins++ )
 		{
-			String name = pad( modPlay3.getInstrumentName( ins ), ' ', 22, false );
-			String len = pad( String.valueOf( modPlay3.getSampleLength( ins ) ), ' ', 6, true );
-			names[ ins - 1 ] = pad( String.valueOf( ins ), '0', 2, true ) + ' ' + name + ' ' + len;
+			String name = ModPlay3.pad( modPlay3.getInstrumentName( ins ), ' ', 22, false );
+			String len = ModPlay3.pad( String.valueOf( modPlay3.getSampleLength( ins ) ), ' ', 6, true );
+			names[ ins - 1 ] = ModPlay3.pad( String.valueOf( ins ), '0', 2, true ) + ' ' + name + ' ' + len;
 		}
 		gadValues[ GADNUM_DIR_LISTBOX ] = new int[ names.length ];
 		gadItem[ GADNUM_DIR_LISTBOX ] = idx - 1;
@@ -1475,27 +1481,55 @@ modPlay3.setPatternData( patternData, 8 );
 		{
 			inputStream.close();
 		}
-		byte[] patternData = new byte[ 8 * 4 * 64 * 128 ];
-		int stride = modPlay3.getNumChannels() * 4;
-		int rows = modPlay3.getPatternData().length / stride;
-		for( int idx = 0; idx < rows; idx++ )
+		synchronized( modPlay3 )
 		{
-			System.arraycopy( modPlay3.getPatternData(), idx * stride, patternData, idx * 8 * 4, stride );
+			byte[] patternData = new byte[ 8 * 4 * 64 * 128 ];
+			int stride = modPlay3.getNumChannels() * 4;
+			int rows = modPlay3.getPatternData().length / stride;
+			for( int idx = 0; idx < rows; idx++ )
+			{
+				System.arraycopy( modPlay3.getPatternData(), idx * stride, patternData, idx * 8 * 4, stride );
+			}
+			modPlay3.setPatternData( patternData, 8 );
+			modPlay3.setSequencer( false );
+			for( int idx = 0; idx < 8; idx ++ )
+			{
+				modPlay3.trigger( idx, 0, 0, 0 );
+			}
+			gadText[ GADNUM_TITLE_TEXTBOX ][ 0 ] = modPlay3.getSongName();
+			gadRedraw[ GADNUM_TITLE_TEXTBOX ] = true;
+			setSeqPos( 0 );
+			byte[] sequence = new byte[ modPlay3.getSongLength() ];
+			for( int seqPos = 0; seqPos < sequence.length; seqPos++ )
+			{
+				sequence[ seqPos ] = ( byte ) modPlay3.getPattern( seqPos );
+			}
+			setSequence( sequence );
+			gadValue[ GADNUM_PATTERN_SLIDER ] = 0;
+			gadRedraw[ GADNUM_PATTERN ] = true;
+			gadValue[ GADNUM_DIR_SLIDER ] = 0;
+			setInstrument( 1 );
 		}
-		modPlay3.setPatternData( patternData, 8 );
-		gadText[ GADNUM_TITLE_TEXTBOX ][ 0 ] = modPlay3.getSongName();
-		gadRedraw[ GADNUM_TITLE_TEXTBOX ] = true;
-		setSeqPos( 0 );
-		byte[] sequence = new byte[ modPlay3.getSongLength() ];
-		for( int seqPos = 0; seqPos < sequence.length; seqPos++ )
+	}
+	
+	private int getAudio( int sampleRate, int[] output )
+	{
+		int count = modPlay3.getAudio( sampleRate, output );
+		if( modPlay3.getSequencer() )
 		{
-			sequence[ seqPos ] = ( byte ) modPlay3.getPattern( seqPos );
+			int seqPos = modPlay3.getSequencePos();
+			int row = modPlay3.getRow();
+			if( seqPos != getSeqPos() )
+			{
+				setSeqPos( seqPos );
+			}
+			if( seqPos != getSeqPos() || row != getRow() )
+			{
+				setRow( row );
+				repaint();
+			}
 		}
-		setSequence( sequence );
-		gadValue[ GADNUM_PATTERN_SLIDER ] = 0;
-		gadRedraw[ GADNUM_PATTERN ] = true;
-		gadValue[ GADNUM_DIR_SLIDER ] = 0;
-		setInstrument( 1 );
+		return count;
 	}
 	
 	public static void main( String[] args ) throws Exception
@@ -1507,5 +1541,52 @@ modPlay3.setPatternData( patternData, 8 );
 		frame.pack();
 		frame.setResizable( false );
 		frame.setVisible( true );
+		final int SAMPLING_RATE = 48000;
+		final int DOWNSAMPLE_BUF_SAMPLES = 2048;
+		final int[] FILTER_COEFFS = { -512, 0, 4096, 8192, 4096, 0, -512 };
+		javax.sound.sampled.AudioFormat audioFormat = new javax.sound.sampled.AudioFormat( SAMPLING_RATE, 16, 2, true, false );
+		javax.sound.sampled.SourceDataLine sourceDataLine = ( javax.sound.sampled.SourceDataLine )
+			javax.sound.sampled.AudioSystem.getLine( new javax.sound.sampled.DataLine.Info(
+				javax.sound.sampled.SourceDataLine.class, audioFormat ) );
+		sourceDataLine.open( audioFormat, 4096 );
+		try
+		{
+			sourceDataLine.start();
+			byte[] outBuf = new byte[ DOWNSAMPLE_BUF_SAMPLES * 2 ];
+			int[] reverbBuf = new int[ ( SAMPLING_RATE / 20 ) * 2 ];
+			int[] downsampleBuf = new int[ ( DOWNSAMPLE_BUF_SAMPLES + FILTER_COEFFS.length ) * 2 ];
+			int[] mixBuf = new int[ SAMPLING_RATE * 2 / 5 ];
+			int mixIdx = 0, mixLen = 0, reverbIdx = 0;
+			while( frame.isDisplayable() )
+			{
+				System.arraycopy( downsampleBuf, DOWNSAMPLE_BUF_SAMPLES * 2, downsampleBuf, 0, FILTER_COEFFS.length * 2 );
+				int offset = FILTER_COEFFS.length;
+				int length = offset + DOWNSAMPLE_BUF_SAMPLES;
+				while( offset < length )
+				{
+					if( mixIdx >= mixLen )
+					{
+						mixLen = tracker3.getAudio( SAMPLING_RATE * 2, mixBuf );
+						mixIdx = 0;
+					}
+					int count = length - offset;
+					if( count > mixLen - mixIdx )
+					{
+						count = mixLen - mixIdx;
+					}
+					System.arraycopy( mixBuf, mixIdx * 2, downsampleBuf, offset * 2, count * 2 );
+					mixIdx += count;
+					offset += count;
+				}
+				ModPlay3.downsample( downsampleBuf, DOWNSAMPLE_BUF_SAMPLES / 2, FILTER_COEFFS );
+				reverbIdx = ModPlay3.reverb( downsampleBuf, reverbBuf, reverbIdx, DOWNSAMPLE_BUF_SAMPLES / 2 );
+				ModPlay3.clip( downsampleBuf, outBuf, DOWNSAMPLE_BUF_SAMPLES );
+				sourceDataLine.write( outBuf, 0, DOWNSAMPLE_BUF_SAMPLES * 2 );
+			}
+		}
+		finally
+		{
+			sourceDataLine.close();
+		}
 	}
 }
