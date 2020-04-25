@@ -211,6 +211,8 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private static final int GADNUM_SAVE_BUTTON = 30;
 	private static final int GADNUM_VER_LABEL = 31;
 	private static final int GADNUM_PLAY_BUTTON = 32;
+	
+	private static final int SAMPLING_RATE = 48000;
 
 	private int width, height, clickX, clickY, clicked, focus;
 	
@@ -1028,7 +1030,7 @@ modPlay3.setPatternData( patternData, 8 );
 	private void drawPattern( Graphics g, int gadnum )
 	{
 		byte[] patternData = modPlay3.getPatternData();
-		int pat = modPlay3.getPattern( getSeqPos() );
+		int pat = modPlay3.getPattern( modPlay3.getSequencePos() );
 		int x = gadX[ gadnum ];
 		int y = gadY[ gadnum ];
 		if( gadLink[ gadnum ] > 0 )
@@ -1161,7 +1163,7 @@ modPlay3.setPatternData( patternData, 8 );
 	{
 	}
 	
-	private void action( int gadnum )
+	private synchronized void action( int gadnum )
 	{
 		try
 		{
@@ -1237,6 +1239,16 @@ modPlay3.setPatternData( patternData, 8 );
 					break;
 				case GADNUM_SEQ_LISTBOX:
 					setSeqPos( gadItem[ gadnum ] );
+					setRow( 0 );
+					if( modPlay3.getSequencer() )
+					{
+						modPlay3.seek( getSeqPos(), 0, SAMPLING_RATE );
+					}
+					else
+					{
+						modPlay3.setSequencePos( getSeqPos(), 0 );
+						stop();
+					}
 					break;
 				case GADNUM_SEQ_INS_BUTTON:
 					insertSeq();
@@ -1245,11 +1257,8 @@ modPlay3.setPatternData( patternData, 8 );
 					deleteSeq();
 					break;
 				case GADNUM_PLAY_BUTTON:
-					synchronized( modPlay3 )
-					{
-						modPlay3.setSequencer( true );
-						modPlay3.setSequencePos( getSeqPos(), getRow() );
-					}
+					modPlay3.setSequencer( true );
+					modPlay3.seek( getSeqPos(), 0, SAMPLING_RATE );
 					break;
 				default:
 					System.out.println( gadnum );
@@ -1424,10 +1433,10 @@ modPlay3.setPatternData( patternData, 8 );
 		return gadItem[ GADNUM_SEQ_LISTBOX ];
 	}
 	
-	private void setSeqPos( int pos )
+	private void setSeqPos( int seqPos )
 	{
-		gadText[ GADNUM_SEQ_TEXTBOX ][ 0 ] = String.valueOf( modPlay3.getPattern( pos ) );
-		gadItem[ GADNUM_SEQ_LISTBOX ] = pos;
+		gadText[ GADNUM_SEQ_TEXTBOX ][ 0 ] = String.valueOf( modPlay3.getPattern( seqPos ) );
+		gadItem[ GADNUM_SEQ_LISTBOX ] = seqPos;
 		gadRedraw[ GADNUM_SEQ_TEXTBOX ] = true;
 		gadRedraw[ GADNUM_SEQ_LISTBOX ] = true;
 		gadRedraw[ GADNUM_PATTERN ] = true;
@@ -1469,6 +1478,15 @@ modPlay3.setPatternData( patternData, 8 );
 		gadRedraw[ GADNUM_INST_FINE_TEXTBOX ] = true;
 	}
 	
+	private void stop()
+	{
+		modPlay3.setSequencer( false );
+		for( int idx = 0; idx < 8; idx ++ )
+		{
+			modPlay3.trigger( idx, 0, 0, 0 );
+		}
+	}
+	
 	private void load( File file ) throws IOException
 	{
 		System.out.println( "Load " + file.getAbsolutePath() );
@@ -1481,50 +1499,43 @@ modPlay3.setPatternData( patternData, 8 );
 		{
 			inputStream.close();
 		}
-		synchronized( modPlay3 )
+		byte[] patternData = new byte[ 8 * 4 * 64 * 128 ];
+		int stride = modPlay3.getNumChannels() * 4;
+		int rows = modPlay3.getPatternData().length / stride;
+		for( int idx = 0; idx < rows; idx++ )
 		{
-			byte[] patternData = new byte[ 8 * 4 * 64 * 128 ];
-			int stride = modPlay3.getNumChannels() * 4;
-			int rows = modPlay3.getPatternData().length / stride;
-			for( int idx = 0; idx < rows; idx++ )
-			{
-				System.arraycopy( modPlay3.getPatternData(), idx * stride, patternData, idx * 8 * 4, stride );
-			}
-			modPlay3.setPatternData( patternData, 8 );
-			modPlay3.setSequencer( false );
-			for( int idx = 0; idx < 8; idx ++ )
-			{
-				modPlay3.trigger( idx, 0, 0, 0 );
-			}
-			gadText[ GADNUM_TITLE_TEXTBOX ][ 0 ] = modPlay3.getSongName();
-			gadRedraw[ GADNUM_TITLE_TEXTBOX ] = true;
-			setSeqPos( 0 );
-			byte[] sequence = new byte[ modPlay3.getSongLength() ];
-			for( int seqPos = 0; seqPos < sequence.length; seqPos++ )
-			{
-				sequence[ seqPos ] = ( byte ) modPlay3.getPattern( seqPos );
-			}
-			setSequence( sequence );
-			gadValue[ GADNUM_PATTERN_SLIDER ] = 0;
-			gadRedraw[ GADNUM_PATTERN ] = true;
-			gadValue[ GADNUM_DIR_SLIDER ] = 0;
-			setInstrument( 1 );
+			System.arraycopy( modPlay3.getPatternData(), idx * stride, patternData, idx * 8 * 4, stride );
 		}
+		modPlay3.setPatternData( patternData, 8 );
+		gadText[ GADNUM_TITLE_TEXTBOX ][ 0 ] = modPlay3.getSongName();
+		gadRedraw[ GADNUM_TITLE_TEXTBOX ] = true;
+		setSeqPos( 0 );
+		setRow( 0 );
+		byte[] sequence = new byte[ modPlay3.getSongLength() ];
+		for( int seqPos = 0; seqPos < sequence.length; seqPos++ )
+		{
+			sequence[ seqPos ] = ( byte ) modPlay3.getPattern( seqPos );
+		}
+		setSequence( sequence );
+		gadValue[ GADNUM_DIR_SLIDER ] = 0;
+		setInstrument( 1 );
+		stop();
 	}
 	
-	private int getAudio( int sampleRate, int[] output )
+	private synchronized int getAudio( int sampleRate, int[] output )
 	{
 		int count = modPlay3.getAudio( sampleRate, output );
-		if( modPlay3.getSequencer() )
+		if( modPlay3.getSequencer() && clicked != GADNUM_PATTERN_SLIDER )
 		{
 			int seqPos = modPlay3.getSequencePos();
 			int row = modPlay3.getRow();
-			if( seqPos != getSeqPos() )
-			{
-				setSeqPos( seqPos );
-			}
 			if( seqPos != getSeqPos() || row != getRow() )
 			{
+				int dt = ( ( int ) System.currentTimeMillis() ) - gadRange[ GADNUM_SEQ_LISTBOX ];
+				if( seqPos != getSeqPos() && ( dt < 0 || dt > 500 ) )
+				{
+					setSeqPos( seqPos );
+				}
 				setRow( row );
 				repaint();
 			}
@@ -1541,7 +1552,6 @@ modPlay3.setPatternData( patternData, 8 );
 		frame.pack();
 		frame.setResizable( false );
 		frame.setVisible( true );
-		final int SAMPLING_RATE = 48000;
 		final int DOWNSAMPLE_BUF_SAMPLES = 2048;
 		final int[] FILTER_COEFFS = { -512, 0, 4096, 8192, 4096, 0, -512 };
 		javax.sound.sampled.AudioFormat audioFormat = new javax.sound.sampled.AudioFormat( SAMPLING_RATE, 16, 2, true, false );

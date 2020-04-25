@@ -207,7 +207,7 @@ public class ModPlay3
 		setSequencePos( 0, 0 );
 	}
 	
-	public synchronized void writeModule( java.io.OutputStream outputStream ) throws java.io.IOException
+	public void writeModule( java.io.OutputStream outputStream ) throws java.io.IOException
 	{
 		byte[] header = new byte[ 1084 ];
 		writeAscii( songName, header, 0, 20 );
@@ -260,48 +260,48 @@ public class ModPlay3
 		}
 	}
 	
-	public synchronized String getSongName()
+	public String getSongName()
 	{
 		return songName;
 	}
 	
-	public synchronized void setSongName( String name )
+	public void setSongName( String name )
 	{
 		songName = name.length() > 20 ? name.substring( 0, 20 ) : name;
 	}
 	
-	public synchronized String getInstrumentName( int idx )
+	public String getInstrumentName( int idx )
 	{
 		return instrumentNames[ idx ];
 	}
 	
-	public synchronized void setInstrumentName( int idx, String name )
+	public void setInstrumentName( int idx, String name )
 	{
 		instrumentNames[ idx ] = name.length() > 22 ? name.substring( 0, 22 ) : name;
 	}
 	
-	public synchronized int getSampleLength( int idx )
+	public int getSampleLength( int idx )
 	{
 		return sampleData[ idx ].length;
 	}
 	
-	public synchronized int getSampleVolume( int idx )
+	public int getSampleVolume( int idx )
 	{
 		return sampleVolume[ idx ];
 	}
 	
-	public synchronized void setSampleVolume( int idx, int volume )
+	public void setSampleVolume( int idx, int volume )
 	{
 		sampleVolume[ idx ] = ( volume < 0 || volume > 64 ) ? 64 : volume;
 	}
 	
-	public synchronized int getSampleFinetune( int idx )
+	public int getSampleFinetune( int idx )
 	{
 		int finetune = sampleFineTune[ idx ];
 		return finetune < 8 ? finetune : finetune - 16;
 	}
 	
-	public synchronized void setSampleFinetune( int idx, int finetune ) 
+	public void setSampleFinetune( int idx, int finetune ) 
 	{
 		if( finetune < -8 || finetune > 7 )
 		{
@@ -310,17 +310,17 @@ public class ModPlay3
 		sampleFineTune[ idx ] = finetune < 0 ? finetune + 16 : finetune;
 	}
 	
-	public synchronized int getSampleLoopStart( int idx )
+	public int getSampleLoopStart( int idx )
 	{
 		return sampleLoopStart[ idx ] >> FIXED_POINT_SHIFT;
 	}
 	
-	public synchronized int getSampleLoopLength( int idx )
+	public int getSampleLoopLength( int idx )
 	{
 		return sampleLoopLength[ idx ] >> FIXED_POINT_SHIFT;
 	}
 	
-	public synchronized void setSampleLoop( int idx, int loopStart, int loopLength )
+	public void setSampleLoop( int idx, int loopStart, int loopLength )
 	{
 		int sampleLength = sampleData[ idx ].length;
 		if( loopStart < 0 || loopStart > sampleLength )
@@ -335,40 +335,40 @@ public class ModPlay3
 		sampleLoopLength[ idx ] = ( loopLength & -2 ) * FIXED_POINT_ONE;
 	}
 	
-	public synchronized void setSampleData( int idx, byte[] data )
+	public void setSampleData( int idx, byte[] data )
 	{
 		sampleData[ idx ] = new byte[ ( data.length > 0x1FFFE ? 0x1FFFE : data.length ) & -2 ];
 		System.arraycopy( data, 0, sampleData[ idx ], 0, sampleData[ idx ].length );
 		setSampleLoop( idx, 0, 0 );
 	}
 	
-	public synchronized int getNumChannels()
+	public int getNumChannels()
 	{
 		return numChannels;
 	}
 	
-	public synchronized int getSongLength()
+	public int getSongLength()
 	{
 		return songLength;
 	}
 	
-	public synchronized int getPattern( int sequencePos )
+	public int getPattern( int sequencePos )
 	{
 		return sequence[ sequencePos ];
 	}
 	
-	public synchronized void setSequence( byte[] sequence )
+	public void setSequence( byte[] sequence )
 	{
 		this.sequence = sequence;
 		this.songLength = sequence.length;
 	}
 	
-	public synchronized byte[] getPatternData()
+	public byte[] getPatternData()
 	{
 		return patternData;
 	}
 	
-	public synchronized void setPatternData( byte[] patternData, int numChannels )
+	public void setPatternData( byte[] patternData, int numChannels )
 	{
 		this.patternData = patternData;
 		this.numChannels = numChannels;
@@ -376,18 +376,18 @@ public class ModPlay3
 		this.c2Rate = numChannels == 4 ? 8287 : 8363;
 	}
 	
-	public synchronized int getRow()
+	public int getRow()
 	{
 		return currentRow;
 	}
 	
-	public synchronized int getSequencePos()
+	public int getSequencePos()
 	{
 		return currentSequencePos;
 	}
 	
 	/* Set the position in the sequence. The tempo is reset to the default. */
-	public synchronized void setSequencePos( int sequencePos, int row )
+	public void setSequencePos( int sequencePos, int row )
 	{
 		if( sequencePos < 0 || sequencePos >= songLength )
 		{
@@ -436,7 +436,7 @@ public class ModPlay3
 	}
 	
 	/* Seek to the specified position in the sequence. */
-	public synchronized void seek( int sequencePos, int row, int sampleRate )
+	public void seek( int sequencePos, int row, int sampleRate )
 	{
 		if( sequencePos < 0 || sequencePos >= songLength )
 		{
@@ -463,27 +463,27 @@ public class ModPlay3
 		}
 	}
 	
-	public synchronized int getMute()
+	public int getMute()
 	{
 		return mute;
 	}
 	
-	public synchronized void setMute( int bitmask )
+	public void setMute( int bitmask )
 	{
 		mute = bitmask;
 	}
 	
-	public synchronized boolean getSequencer()
+	public boolean getSequencer()
 	{
 		return sequencerEnabled;
 	}
 	
-	public synchronized void setSequencer( boolean enabled )
+	public void setSequencer( boolean enabled )
 	{
 		sequencerEnabled = enabled;
 	}
 	
-	public synchronized void trigger( int channel, int instrument, int key, int volume )
+	public void trigger( int channel, int instrument, int key, int volume )
 	{
 		if( instrument > 0 )
 		{
@@ -496,7 +496,7 @@ public class ModPlay3
 	
 	/* Returns number of stereo samples produced.
 	   Output buffer must be of length sampleRate / 5. */
-	public synchronized int getAudio( int sampleRate, int[] output )
+	public int getAudio( int sampleRate, int[] output )
 	{
 		int count = ( sampleRate * 5 ) / ( tempo * 2 );
 		for( int idx = 0, end = ( count + 32 ) * 2; idx < end; idx++ )
