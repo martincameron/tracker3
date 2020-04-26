@@ -214,7 +214,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	
 	private static final int SAMPLING_RATE = 48000;
 
-	private int width, height, clickX, clickY, clicked, focus;
+	private int width, height, clickX, clickY, focus;
 	
 	private int[] gadType = new int[ GAD_COUNT ];
 	private int[] gadX = new int[ GAD_COUNT ];
@@ -327,7 +327,7 @@ patternData[ 3 ] = 0x40;
 modPlay3.setPatternData( patternData, 8 );
 	}
 	
-	public void keyPressed( KeyEvent e )
+	public synchronized void keyPressed( KeyEvent e )
 	{
 		switch( gadType[ focus ] )
 		{
@@ -340,43 +340,40 @@ modPlay3.setPatternData( patternData, 8 );
 		}
 	}
 	
-	public void keyReleased( KeyEvent e )
+	public synchronized void keyReleased( KeyEvent e )
 	{
 	}
 	
-	public void keyTyped( KeyEvent e )
+	public synchronized void keyTyped( KeyEvent e )
 	{
 	}
 	
-	public void mouseClicked( MouseEvent e )
+	public synchronized void mouseClicked( MouseEvent e )
 	{
 	}
 	
-	public void mouseEntered( MouseEvent e )
+	public synchronized void mouseEntered( MouseEvent e )
 	{
 	}
 	
-	public void mouseExited( MouseEvent e )
+	public synchronized void mouseExited( MouseEvent e )
 	{
 	}
 	
-	public void mousePressed( MouseEvent e )
+	public synchronized void mousePressed( MouseEvent e )
 	{
 		clickX = e.getX();
 		clickY = e.getY();
-		clicked = findGadget( clickX, clickY );
+		int clicked = findGadget( clickX, clickY );
 		if( focus > 0 && focus != clicked )
 		{
 			gadRedraw[ focus ] = true;
-			repaint();
 		}
-		focus = clicked;
 		switch( gadType[ clicked ] )
 		{
 			case GAD_TYPE_BUTTON:
 				gadSelected[ clicked ] = true;
 				gadRedraw[ clicked ] = true;
-				repaint();
 				break;
 			case GAD_TYPE_TEXTBOX:
 				clickTextbox( clicked );
@@ -393,82 +390,91 @@ modPlay3.setPatternData( patternData, 8 );
 					action( clicked );
 				}
 		}
+		focus = clicked;
+		repaint();
 	}
 	
-	public void mouseReleased( MouseEvent e )
+	public synchronized void mouseReleased( MouseEvent e )
 	{
-		if( clicked > 0 )
+		if( focus > 0 )
 		{
-			int gadnum = findGadget( e.getX(), e.getY() );
-			if( ( gadType[ clicked ] == GAD_TYPE_BUTTON && gadnum == clicked )
-				|| gadType[ clicked ] == GAD_TYPE_SLIDER )
-			{
-				gadSelected[ clicked ] = false;
-				gadRedraw[ clicked ] = true;
-				action( clicked );
-				repaint();
-			}
-			clicked = 0;
-		}
-	}
-	
-	public void mouseDragged( MouseEvent e )
-	{
-		if( clicked > 0 )
-		{
-			switch( gadType[ clicked ] )
+			switch( gadType[ focus ] )
 			{
 				case GAD_TYPE_BUTTON:
-					boolean selected = findGadget( e.getX(), e.getY() ) == clicked;
-					if( gadSelected[ clicked ] != selected )
+					if( findGadget( e.getX(), e.getY() ) == focus )
 					{
-						gadSelected[ clicked ] = selected;
-						gadRedraw[ clicked ] = true;
+						gadSelected[ focus ] = false;
+						gadRedraw[ focus ] = true;
+						action( focus );
+						focus = 0;
 						repaint();
 					}
 					break;
 				case GAD_TYPE_SLIDER:
-					dragSlider( clicked, e.getY() );
+					action( focus );
+					focus = 0;
+					repaint();
 					break;
 			}
 		}
 	}
 	
-	public void mouseMoved( MouseEvent e )
+	public synchronized void mouseDragged( MouseEvent e )
+	{
+		if( focus > 0 )
+		{
+			switch( gadType[ focus ] )
+			{
+				case GAD_TYPE_BUTTON:
+					boolean selected = findGadget( e.getX(), e.getY() ) == focus;
+					if( gadSelected[ focus ] != selected )
+					{
+						gadSelected[ focus ] = selected;
+						gadRedraw[ focus ] = true;
+						repaint();
+					}
+					break;
+				case GAD_TYPE_SLIDER:
+					dragSlider( focus, e.getY() );
+					break;
+			}
+		}
+	}
+	
+	public synchronized void mouseMoved( MouseEvent e )
 	{
 	}
 	
-	public void windowActivated( WindowEvent e )
+	public synchronized void windowActivated( WindowEvent e )
 	{
 	}
 	
-	public void windowClosed( WindowEvent e )
+	public synchronized void windowClosed( WindowEvent e )
 	{
 	}
 	
-	public void windowClosing( WindowEvent e )
+	public synchronized void windowClosing( WindowEvent e )
 	{
 		e.getWindow().dispose();
 	}
 	
-	public void windowDeactivated( WindowEvent e )
+	public synchronized void windowDeactivated( WindowEvent e )
 	{
 	}
 	
-	public void windowDeiconified( WindowEvent e )
+	public synchronized void windowDeiconified( WindowEvent e )
 	{
 	}
 	
-	public void windowIconified( WindowEvent e )
+	public synchronized void windowIconified( WindowEvent e )
 	{
 	}
 	
-	public void windowOpened( WindowEvent e )
+	public synchronized void windowOpened( WindowEvent e )
 	{
 	}
 	
-	@Override
-	public void paint( Graphics g ) {
+	public synchronized void paint( Graphics g ) {
 		if( charset == null ) {
 			charset = createImage( charsetImage( TOPAZ_8 ).getSource() );
 		}
@@ -530,14 +536,12 @@ modPlay3.setPatternData( patternData, 8 );
 		}
 		g.drawImage( image, 0, 0, null );
 	}
-
-	@Override
-	public void update( Graphics g ) {
+	
+	public synchronized void update( Graphics g ) {
 		paint( g );
 	}
 	
-	@Override
-	public Dimension getPreferredSize()
+	public synchronized Dimension getPreferredSize()
 	{
 		return new Dimension( width, height );
 	}
@@ -668,15 +672,10 @@ modPlay3.setPatternData( patternData, 8 );
 		String text = gadText[ gadnum ][ 0 ];
 		int cursor = gadItem[ gadnum ];
 		int columns = ( w - 16 ) / 8;
-		int offset = gadValue[ gadnum ];
-		if( focus != gadnum )
+		int offset = focus == gadnum ? gadValue[ gadnum ] : text.length() - columns;
+		if( offset < 0 || offset > text.length() )
 		{
-			offset = text.length() - columns;
-			if( offset < 0 )
-			{
-				offset = 0;
-			}
-			gadValue[ gadnum ] = offset;
+			offset = 0;
 		}
 		if( offset + columns > text.length() )
 		{
@@ -685,9 +684,9 @@ modPlay3.setPatternData( patternData, 8 );
 		g.setColor( BACKGROUND );
 		g.fillRect( x, y, w, h );
 		drawText( g, x + 8, y + 6, text.substring( offset, offset + columns ), TEXT_SHADOW_BACKGROUND );
-		if( focus == gadnum && cursor >= offset )
+		if( focus == gadnum && cursor >= offset && cursor <= offset + columns )
 		{
-			String chr = String.valueOf( cursor < offset + columns ? text.charAt( cursor ) : ' ' );
+			String chr = cursor < offset + columns ? String.valueOf( text.charAt( cursor ) ) : " ";
 			drawText( g, x + ( cursor - offset + 1 ) * 8, y + 6, chr, TEXT_SHADOW_SELECTED );
 		}
 		bevelBox( g, x, y, w, h );
@@ -697,7 +696,15 @@ modPlay3.setPatternData( patternData, 8 );
 	{
 		int columns = ( gadWidth[ gadnum ] - 16 ) / 8;
 		String text = gadText[ gadnum ][ 0 ];
-		int offset = gadValue[ gadnum ];
+		int offset = focus == gadnum ? gadValue[ gadnum ] : text.length() - columns;
+		if( offset < 0 || offset > text.length() )
+		{
+			offset = 0;
+		}
+		if( offset + columns > text.length() )
+		{
+			columns = text.length() - offset;
+		}
 		int cursor = offset + ( clickX - gadX[ gadnum ] ) / 8 - 1;
 		if( cursor > text.length() )
 		{
@@ -707,9 +714,9 @@ modPlay3.setPatternData( patternData, 8 );
 		{
 			cursor = 0;
 		}
+		gadValue[ gadnum ] = offset;
 		gadItem[ gadnum ] = cursor;
 		gadRedraw[ gadnum ] = true;
-		repaint();
 	}
 
 	private void keyTextbox( int gadnum, char chr, int key )
@@ -717,7 +724,15 @@ modPlay3.setPatternData( patternData, 8 );
 		int columns = ( gadWidth[ gadnum ] - 16 ) / 8;
 		String text = gadText[ gadnum ][ 0 ];
 		int offset = gadValue[ gadnum ];
+		if( offset < 0 || offset > text.length() )
+		{
+			offset = 0;
+		}
 		int cursor = gadItem[ gadnum ];
+		if( cursor > text.length() )
+		{
+			cursor = text.length();
+		}
 		switch( key ) 
 		{
 			case KEY_BACKSPACE:
@@ -741,7 +756,7 @@ modPlay3.setPatternData( patternData, 8 );
 				cursor = text.length();
 				if( cursor - offset >= columns )
 				{
-					offset = cursor - columns + 1;
+					offset = cursor - columns;
 				}
 				break;
 			case KEY_ESCAPE:
@@ -829,7 +844,6 @@ modPlay3.setPatternData( patternData, 8 );
 			gadValue[ gadnum ] = sp;
 			gadRedraw[ gadLink[ gadnum ] > 0 ? gadLink[ gadnum ] : gadnum ] = true;
 			action( gadnum );
-			repaint();
 		}
 		else if( clickY > ( sy + ss ) )
 		{
@@ -841,7 +855,6 @@ modPlay3.setPatternData( patternData, 8 );
 			gadValue[ gadnum ] = sp;
 			gadRedraw[ gadLink[ gadnum ] > 0 ? gadLink[ gadnum ] : gadnum ] = true;
 			action( gadnum );
-			repaint();
 		}
 	}
 	
@@ -943,7 +956,6 @@ modPlay3.setPatternData( patternData, 8 );
 			gadRange[ gadnum ] = time;
 			gadRedraw[ gadnum ] = true;
 		}
-		repaint();
 	}
 	
 	private void keyListbox( int gadnum, char chr, int key )
@@ -1030,7 +1042,8 @@ modPlay3.setPatternData( patternData, 8 );
 	private void drawPattern( Graphics g, int gadnum )
 	{
 		byte[] patternData = modPlay3.getPatternData();
-		int pat = modPlay3.getPattern( modPlay3.getSequencePos() );
+		int pos = modPlay3.getSequencePos();
+		int pat = modPlay3.getPattern( pos < modPlay3.getSongLength() ? pos : 0 );
 		int x = gadX[ gadnum ];
 		int y = gadY[ gadnum ];
 		if( gadLink[ gadnum ] > 0 )
@@ -1163,7 +1176,7 @@ modPlay3.setPatternData( patternData, 8 );
 	{
 	}
 	
-	private synchronized void action( int gadnum )
+	private void action( int gadnum )
 	{
 		try
 		{
@@ -1435,6 +1448,10 @@ modPlay3.setPatternData( patternData, 8 );
 	
 	private void setSeqPos( int seqPos )
 	{
+		if( seqPos >= modPlay3.getSongLength() )
+		{
+			seqPos = 0;
+		}
 		gadText[ GADNUM_SEQ_TEXTBOX ][ 0 ] = String.valueOf( modPlay3.getPattern( seqPos ) );
 		gadItem[ GADNUM_SEQ_LISTBOX ] = seqPos;
 		gadRedraw[ GADNUM_SEQ_TEXTBOX ] = true;
@@ -1525,7 +1542,7 @@ modPlay3.setPatternData( patternData, 8 );
 	private synchronized int getAudio( int sampleRate, int[] output )
 	{
 		int count = modPlay3.getAudio( sampleRate, output );
-		if( modPlay3.getSequencer() && clicked != GADNUM_PATTERN_SLIDER )
+		if( modPlay3.getSequencer() && focus != GADNUM_PATTERN_SLIDER )
 		{
 			int seqPos = modPlay3.getSequencePos();
 			int row = modPlay3.getRow();
