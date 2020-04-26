@@ -1044,6 +1044,7 @@ modPlay3.setPatternData( patternData, 8 );
 		byte[] patternData = modPlay3.getPatternData();
 		int pos = modPlay3.getSequencePos();
 		int pat = modPlay3.getPattern( pos < modPlay3.getSongLength() ? pos : 0 );
+		int mute = modPlay3.getMute();
 		int x = gadX[ gadnum ];
 		int y = gadY[ gadnum ];
 		if( gadLink[ gadnum ] > 0 )
@@ -1059,8 +1060,9 @@ modPlay3.setPatternData( patternData, 8 );
 		drawInt( g, x, y, pat, 3, 7 );
 		for( int c = 0; c < 8; c++ )
 		{
-			drawText( g, x + ( c * 9 + 4 ) * 8, y, "Channel  ", 4 );
-			drawInt( g, x + ( c * 9 + 11 ) * 8, y, c + 1, 1, 4 );
+			int clr = ( ( mute >> c ) & 1 ) > 0 ? TEXT_RED : TEXT_BLUE;
+			drawText( g, x + ( c * 9 + 4 ) * 8, y, clr == TEXT_RED ? " Muted   " : "Channel  ", clr );
+			drawInt( g, x + ( c * 9 + 11 ) * 8, y, c + 1, 1, clr );
 		}
 		for( int r = 1; r < 16; r++ )
 		{
@@ -1078,6 +1080,12 @@ modPlay3.setPatternData( patternData, 8 );
 				for( int c = 0; c < 8; c++ )
 				{
 					String note = getNote( patternData, pat, dr, c );
+					if( ( ( mute >> c ) & 1 ) > 0 )
+					{
+						drawText( g, x + ( c * 9 + 4 ) * 8, y + r * 16, note, TEXT_BLUE );
+						drawText( g, x + ( c * 9 + 12 ) * 8, y + r * 16, " ", TEXT_BLUE );
+						continue;
+					}
 					int clr = note.charAt( 0 ) == '-' ? TEXT_BLUE : TEXT_CYAN;
 					drawText( g, x + ( c * 9 + 4 ) * 8, y + r * 16, note.substring( 0, 3 ), clr + hl );
 					clr = note.charAt( 3 ) == '-' ? TEXT_BLUE : TEXT_RED;
