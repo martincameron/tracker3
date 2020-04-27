@@ -384,6 +384,9 @@ modPlay3.setPatternData( patternData, 8 );
 			case GAD_TYPE_LISTBOX:
 				clickListbox( clicked );
 				break;
+			case GAD_TYPE_PATTERN:
+				clickPattern( clicked );
+				break;
 			default:
 				if( clicked > 0 )
 				{
@@ -1111,6 +1114,25 @@ modPlay3.setPatternData( patternData, 8 );
 		}
 	}
 	
+	private void clickPattern( int gadnum )
+	{
+		int col = ( clickX - gadX[ gadnum ] ) / 8;
+		int chan = 1 << ( col - 4 ) / 9;
+		int mute = modPlay3.getMute();
+		if( mute == ~chan || col < 4 ) {
+			/* Solo channel, unmute all. */
+			mute = 0;
+		} else if( ( mute & chan ) > 0 ) {
+			/* Muted channel, unmute. */
+			mute ^= chan;
+		} else {
+			/* Unmuted channel, set as solo. */
+			mute = -1 ^ chan;
+		}
+		modPlay3.setMute( mute );
+		gadRedraw[ GADNUM_PATTERN ] = true;
+	}
+	
 	private int findGadget( int x, int y )
 	{
 		for( int idx = 0; idx < GAD_COUNT; idx++ )
@@ -1583,7 +1605,7 @@ modPlay3.setPatternData( patternData, 8 );
 		javax.sound.sampled.SourceDataLine sourceDataLine = ( javax.sound.sampled.SourceDataLine )
 			javax.sound.sampled.AudioSystem.getLine( new javax.sound.sampled.DataLine.Info(
 				javax.sound.sampled.SourceDataLine.class, audioFormat ) );
-		sourceDataLine.open( audioFormat, 4096 );
+		sourceDataLine.open( audioFormat, 16384 );
 		try
 		{
 			sourceDataLine.start();
