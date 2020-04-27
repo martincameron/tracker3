@@ -626,11 +626,8 @@ public class ModPlay3
 				channelAssigned[ chn ] = instrument;
 				channelVolume[ chn ] = sampleVolume[ instrument ];
 				channelSampleOffset[ chn ] = 0;
-				if( channelSamplePos[ chn ] >= sampleLoopStart[ channelInstrument[ chn ] ]
-					&& sampleLoopLength[ instrument ] > 0 && channelInstrument[ chn ] > 0 )
+				if( sampleLoopLength[ instrument ] > 0 && channelInstrument[ chn ] > 0 )
 				{
-					channelSamplePos[ chn ] -= sampleLoopStart[ channelInstrument[ chn ] ];
-					channelSamplePos[ chn ] = sampleLoopStart[ instrument ] + channelSamplePos[ chn ] % sampleLoopLength[ instrument ];
 					channelInstrument[ chn ] = instrument;
 				}
 			}
