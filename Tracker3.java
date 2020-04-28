@@ -1050,6 +1050,9 @@ modPlay3.setPatternData( patternData, 8 );
 		int mute = modPlay3.getMute();
 		int x = gadX[ gadnum ];
 		int y = gadY[ gadnum ];
+		int selChan = ( gadItem[ gadnum ] >> 16 ) & 0xFF;
+		int selRow = ( gadItem[ gadnum ] >> 8 ) & 0xFF;
+		int selCol = gadItem[ gadnum ] & 0xFF;
 		if( gadLink[ gadnum ] > 0 )
 		{
 			gadValue[ gadnum ] = gadValue[ gadLink[ gadnum ] ];
@@ -1087,28 +1090,45 @@ modPlay3.setPatternData( patternData, 8 );
 					{
 						drawText( g, x + ( c * 9 + 4 ) * 8, y + r * 16, note, TEXT_BLUE );
 						drawText( g, x + ( c * 9 + 12 ) * 8, y + r * 16, " ", TEXT_BLUE );
-						continue;
-					}
-					int clr = note.charAt( 0 ) == '-' ? TEXT_BLUE : TEXT_CYAN;
-					drawText( g, x + ( c * 9 + 4 ) * 8, y + r * 16, note.substring( 0, 3 ), clr + hl );
-					clr = note.charAt( 3 ) == '-' ? TEXT_BLUE : TEXT_RED;
-					drawText( g, x + ( c * 9 + 7 ) * 8, y + r * 16, note.substring( 3, 4 ), clr + hl );
-					clr = note.charAt( 4 ) == '-' ? TEXT_BLUE : TEXT_RED;
-					drawText( g, x + ( c * 9 + 8 ) * 8, y + r * 16, note.substring( 4, 5 ), clr + hl );
-					if( note.charAt( 5 ) == 'E' && note.charAt( 6 ) >= '0' && note.charAt( 6 ) <= 'F')
-					{
-						clr = EX_COLOURS[ note.charAt( 6 ) - '0' ];
-					}
-					else if( note.charAt( 5 ) >= '0' && note.charAt( 5 ) <= '~' )
-					{
-						clr = FX_COLOURS[ note.charAt( 5 ) - '0' ];
 					}
 					else
 					{
-						clr = TEXT_BLUE;
+						int clr = note.charAt( 0 ) == '-' ? TEXT_BLUE : TEXT_CYAN;
+						drawText( g, x + ( c * 9 + 4 ) * 8, y + r * 16, note.substring( 0, 3 ), clr + hl );
+						clr = note.charAt( 3 ) == '-' ? TEXT_BLUE : TEXT_RED;
+						drawText( g, x + ( c * 9 + 7 ) * 8, y + r * 16, note.substring( 3, 4 ), clr + hl );
+						clr = note.charAt( 4 ) == '-' ? TEXT_BLUE : TEXT_RED;
+						drawText( g, x + ( c * 9 + 8 ) * 8, y + r * 16, note.substring( 4, 5 ), clr + hl );
+						if( note.charAt( 5 ) == 'E' && note.charAt( 6 ) >= '0' && note.charAt( 6 ) <= 'F')
+						{
+							clr = EX_COLOURS[ note.charAt( 6 ) - '0' ];
+						}
+						else if( note.charAt( 5 ) >= '0' && note.charAt( 5 ) <= '~' )
+						{
+							clr = FX_COLOURS[ note.charAt( 5 ) - '0' ];
+						}
+						else
+						{
+							clr = TEXT_BLUE;
+						}
+						drawText( g, x + ( c * 9 + 9 ) * 8, y + r * 16, note.substring( 5, 8 ), clr + hl );
+						drawText( g, x + ( c * 9 + 12 ) * 8, y + r * 16, " ", clr + hl );
 					}
-					drawText( g, x + ( c * 9 + 9 ) * 8, y + r * 16, note.substring( 5, 8 ), clr + hl );
-					drawText( g, x + ( c * 9 + 12 ) * 8, y + r * 16, " ", clr + hl );
+					if( selChan == c + 1 && selRow == dr )
+					{
+						int bx = c * 9 + 4;
+						int bw = 8;
+						if( selCol > 2 && selCol < 8 )
+						{
+							bx += selCol;
+							bw = 1;
+						}
+						g.setColor( Color.YELLOW );
+						g.fillRect( x + bx * 8 - 1, y + r * 16 - 1, 1, 16 );
+						g.fillRect( x + bx * 8, y + r * 16 - 2, bw * 8, 1 );
+						g.fillRect( x + bx * 8, y + ( r + 1 ) * 16 - 1, bw * 8, 1 );
+						g.fillRect( x + ( bx + bw ) * 8, y + r * 16 - 1, 1, 16 );
+					}
 				}
 			}
 		}
@@ -1116,20 +1136,37 @@ modPlay3.setPatternData( patternData, 8 );
 	
 	private void clickPattern( int gadnum )
 	{
+		int row = ( clickY - gadY[ gadnum ] ) / 16;
 		int col = ( clickX - gadX[ gadnum ] ) / 8;
-		int chan = 1 << ( col - 4 ) / 9;
-		int mute = modPlay3.getMute();
-		if( mute == ~chan || col < 4 ) {
-			/* Solo channel, unmute all. */
-			mute = 0;
-		} else if( ( mute & chan ) > 0 ) {
-			/* Muted channel, unmute. */
-			mute ^= chan;
-		} else {
-			/* Unmuted channel, set as solo. */
-			mute = -1 ^ chan;
+		int chn = ( col - 4 ) / 9;
+		if( row < 1 || modPlay3.getSequencer() )
+		{
+			int mask = 1 << chn;
+			int mute = modPlay3.getMute();
+			if( mute == ~mask || col < 4 ) {
+				/* Solo channel, unmute all. */
+				mute = 0;
+			} else if( ( mute & mask ) > 0 ) {
+				/* Muted channel, unmute. */
+				mute ^= mask;
+			} else {
+				/* Unmuted channel, set as solo. */
+				mute = -1 ^ mask;
+			}
+			modPlay3.setMute( mute );
 		}
-		modPlay3.setMute( mute );
+		else
+		{
+			row = gadValue[ gadnum ] + row - 8;
+			if( col > 3 && row >= 0 && row < 64 )
+			{
+				gadItem[ gadnum ] = ( ( chn + 1 ) << 16 ) | ( row << 8 ) | ( col - chn * 9 - 4 );
+			}
+			else
+			{
+				gadItem[ gadnum ] = 0;
+			}
+		}
 		gadRedraw[ GADNUM_PATTERN ] = true;
 	}
 	
