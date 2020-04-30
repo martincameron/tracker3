@@ -329,21 +329,28 @@ modPlay3.setPatternData( patternData, 8 );
 	
 	public synchronized void keyPressed( KeyEvent e )
 	{
-		if( e.getKeyCode() == KeyEvent.VK_F8 )
+		switch( e.getKeyCode() )
 		{
-			setNumChannels( e.isShiftDown() ? 4 : 8 );
-		}
-		else
-		{
-			switch( gadType[ focus ] )
-			{
-				case GAD_TYPE_TEXTBOX:
-					keyTextbox( focus, e.getKeyChar(), e.getKeyCode() );
-					break;
-				case GAD_TYPE_LISTBOX:
-					keyListbox( focus, e.getKeyChar(), e.getKeyCode() );
-					break;
-			}
+			case KeyEvent.VK_F8:
+				setNumChannels( e.isShiftDown() ? 4 : 8 );
+				break;
+			case KeyEvent.VK_F10:
+				if( e.isShiftDown() )
+				{
+					optimize();
+				}
+				break;
+			default:
+				switch( gadType[ focus ] )
+				{
+					case GAD_TYPE_TEXTBOX:
+						keyTextbox( focus, e.getKeyChar(), e.getKeyCode() );
+						break;
+					case GAD_TYPE_LISTBOX:
+						keyListbox( focus, e.getKeyChar(), e.getKeyCode() );
+						break;
+				}
+				break;
 		}
 		repaint();
 	}
@@ -1598,6 +1605,65 @@ modPlay3.setPatternData( patternData, 8 );
 		}
 		modPlay3.setPatternData( newPatternData, numChannels );
 		gadRedraw[ GADNUM_PATTERN ] = true;
+	}
+	
+	private void deletePattern( int pat )
+	{
+		byte[] patternData = modPlay3.getPatternData();
+		int patLen = modPlay3.getNumChannels() * 4 * 64;
+		int offset = ( pat + 1 ) * patLen;
+		System.arraycopy( patternData, offset, patternData, offset - patLen, patternData.length - offset );
+		modPlay3.setPatternData( patternData, modPlay3.getNumChannels() );
+		byte[] sequence = new byte[ modPlay3.getSongLength() ];
+		for( int pos = 0; pos < sequence.length; pos++ )
+		{
+			int idx = modPlay3.getPattern( pos );
+			if( idx == pat )
+			{
+				idx = 0;
+			}
+			sequence[ pos ] = ( byte ) ( idx < pat ? idx : idx - 1 );
+		}
+		setSequence( sequence );
+	}
+	
+	private void optimize()
+	{
+		boolean[] patternUsed = new boolean[ 128 ];
+		int songLength = modPlay3.getSongLength();
+		int patCount = 0;
+		for( int pos = 0; pos < songLength; pos++ )
+		{
+			int pat = modPlay3.getPattern( pos );
+			if( patCount <= pat )
+			{
+				patCount = pat + 1;
+			}
+			patternUsed[ pat ] = true;
+		}
+		int deleted = 0;
+		for( int idx = 0; idx < patCount; idx++ )
+		{
+			if( !patternUsed[ idx ] )
+			{
+				deletePattern( idx - deleted );
+				deleted++;
+			}
+		}
+		boolean[] instrumentUsed = new boolean[ 32 ];
+		byte[] patternData = modPlay3.getPatternData();
+		for( int idx = 1; idx < patternData.length; idx += 4 )
+		{
+			instrumentUsed[ patternData[ idx ] & 0x1F ] = true;
+		}
+		for( int idx = 1; idx < instrumentUsed.length; idx++ )
+		{
+			if( !instrumentUsed[ idx ] )
+			{
+				modPlay3.setSampleData( idx, new byte[ 0 ] );
+			}
+		}
+		setInstrument( 1 );
 	}
 	
 	private void load( File file ) throws IOException
