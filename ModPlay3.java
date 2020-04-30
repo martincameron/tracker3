@@ -225,9 +225,17 @@ public class ModPlay3
 		}
 		header[ 950 ] = ( byte ) songLength;
 		System.arraycopy( sequence, 0, header, 952, songLength );
+		int patCount = 0;
+		for( int idx = 0; idx < songLength; idx++ )
+		{
+			if( patCount < sequence[ idx ] + 1 ) 
+			{
+				patCount = sequence[ idx ] + 1;
+			}
+		}
 		if( numChannels == 4 )
 		{
-			writeAscii( "M.K.", header, 1080, 4 );
+			writeAscii( patCount > 64 ? "M!K!" : "M.K.", header, 1080, 4 );
 		}
 		else
 		{
@@ -235,15 +243,7 @@ public class ModPlay3
 			writeAscii( "CHN", header, 1081, 3 );
 		}
 		outputStream.write( header );
-		int count = 0;
-		for( int idx = 0; idx < songLength; idx++ )
-		{
-			if( count < sequence[ idx ] + 1 ) 
-			{
-				count = sequence[ idx ] + 1;
-			}
-		}
-		byte[] patterns = new byte[ numChannels * 4 * 64 * count ];
+		byte[] patterns = new byte[ numChannels * 4 * 64 * patCount ];
 		for( int idx = 0; idx < patterns.length; idx += 4 )
 		{
 			int period = keyToPeriod( patternData[ idx ] & 0xFF, 0 );
