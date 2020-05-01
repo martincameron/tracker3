@@ -1361,8 +1361,17 @@ modPlay3.setPatternData( patternData );
 					deleteSeq();
 					break;
 				case GADNUM_PLAY_BUTTON:
-					modPlay3.setSequencer( true );
-					modPlay3.seek( getSeqPos(), 0, SAMPLING_RATE );
+					if( modPlay3.getSequencer() )
+					{
+						stop();
+						gadText[ GADNUM_PLAY_BUTTON ][ 0 ] = "Play";
+					}
+					else
+					{
+						play();
+						gadText[ GADNUM_PLAY_BUTTON ][ 0 ] = "Stop";
+					}
+					gadRedraw[ GADNUM_PLAY_BUTTON ] = true;
 					break;
 				default:
 					System.out.println( gadnum );
@@ -1584,6 +1593,12 @@ modPlay3.setPatternData( patternData );
 		gadRedraw[ GADNUM_INST_LEN_TEXTBOX ] = true;
 		gadText[ GADNUM_INST_FINE_TEXTBOX ][ 0 ] = String.valueOf( modPlay3.getSampleFinetune( idx ) );
 		gadRedraw[ GADNUM_INST_FINE_TEXTBOX ] = true;
+	}
+	
+	private void play()
+	{
+		modPlay3.setSequencer( true );
+		modPlay3.seek( getSeqPos(), gadValue[ GADNUM_PATTERN ], SAMPLING_RATE );
 	}
 	
 	private void stop()
