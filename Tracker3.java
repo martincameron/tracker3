@@ -18,6 +18,7 @@ import java.awt.event.WindowListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
@@ -319,12 +320,12 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 
 		gadRedraw[ 0 ] = true;
 
-byte[] patternData = new byte[ 8 * 4 * 64 * 128 ];
+byte[] patternData = new byte[ ModPlay3.MAX_CHANNELS * 4 * 64 * 128 ];
 patternData[ 0 ] = 0x01;
 patternData[ 1 ] = 0x1F;
 patternData[ 2 ] = 0x0C;
 patternData[ 3 ] = 0x40;
-modPlay3.setPatternData( patternData, 8 );
+modPlay3.setPatternData( patternData );
 	}
 	
 	public synchronized void keyPressed( KeyEvent e )
@@ -332,7 +333,7 @@ modPlay3.setPatternData( patternData, 8 );
 		switch( e.getKeyCode() )
 		{
 			case KeyEvent.VK_F8:
-				setNumChannels( e.isShiftDown() ? 4 : 8 );
+				setNumChannels( modPlay3.getNumChannels() < 8 ? 8 : 4 );
 				break;
 			case KeyEvent.VK_F10:
 				if( e.isShiftDown() )
@@ -1038,7 +1039,7 @@ modPlay3.setPatternData( patternData, 8 );
 	
 	private String getNote( int pat, int row, int channel )
 	{
-		int offset = ( ( pat * 64 + row ) * modPlay3.getNumChannels() + channel ) * 4;
+		int offset = ( ( pat * 64 + row ) * ModPlay3.MAX_CHANNELS + channel ) * 4;
 		byte[] patternData = modPlay3.getPatternData();
 		int key = patternData[ offset ] & 0xFF;
 		int instrument = patternData[ offset + 1 ] & 0xFF;
@@ -1299,6 +1300,9 @@ modPlay3.setPatternData( patternData, 8 );
 							getDir( file.getParentFile() );
 						}
 					}
+					break;
+				case GADNUM_SAVE_BUTTON:
+					save();
 					break;
 				case GADNUM_TITLE_TEXTBOX:
 					modPlay3.setSongName( gadText[ gadnum ][ 0 ] );
@@ -1593,27 +1597,20 @@ modPlay3.setPatternData( patternData, 8 );
 	
 	private void setNumChannels( int numChannels )
 	{
-		int newStride = numChannels * 4;
-		byte[] newPatternData = new byte[ newStride * 64 * 128 ];
-		int oldStride = modPlay3.getNumChannels() * 4;
-		byte[] oldPatternData = modPlay3.getPatternData();
-		int numRows = oldPatternData.length / oldStride;
-		for( int idx = 0; idx < numRows; idx++ )
+		modPlay3.setNumChannels( numChannels );
+		for( int chn = numChannels; chn < ModPlay3.MAX_CHANNELS; chn++ )
 		{
-			System.arraycopy( oldPatternData, idx * oldStride, newPatternData, idx * newStride,
-				newStride > oldStride ? oldStride : newStride );
+			modPlay3.trigger( chn, 0, 0, 0 );
 		}
-		modPlay3.setPatternData( newPatternData, numChannels );
 		gadRedraw[ GADNUM_PATTERN ] = true;
 	}
 	
 	private void deletePattern( int pat )
 	{
 		byte[] patternData = modPlay3.getPatternData();
-		int patLen = modPlay3.getNumChannels() * 4 * 64;
+		int patLen = ModPlay3.MAX_CHANNELS * 4 * 64;
 		int offset = ( pat + 1 ) * patLen;
 		System.arraycopy( patternData, offset, patternData, offset - patLen, patternData.length - offset );
-		modPlay3.setPatternData( patternData, modPlay3.getNumChannels() );
 		byte[] sequence = new byte[ modPlay3.getSongLength() ];
 		for( int pos = 0; pos < sequence.length; pos++ )
 		{
@@ -1652,9 +1649,14 @@ modPlay3.setPatternData( patternData, 8 );
 		}
 		boolean[] instrumentUsed = new boolean[ 32 ];
 		byte[] patternData = modPlay3.getPatternData();
-		for( int idx = 1; idx < patternData.length; idx += 4 )
+		int numRows = patternData.length / ( ModPlay3.MAX_CHANNELS * 4 );
+		int numChannels = modPlay3.getNumChannels();
+		for( int row = 0; row < numRows; row++ )
 		{
-			instrumentUsed[ patternData[ idx ] & 0x1F ] = true;
+			for( int chn = 0; chn < numChannels; chn++ )
+			{
+				instrumentUsed[ patternData[ ( row * ModPlay3.MAX_CHANNELS + chn ) * 4 + 1 ] & 0x1F ] = true;
+			}
 		}
 		for( int idx = 1; idx < instrumentUsed.length; idx++ )
 		{
@@ -1678,7 +1680,9 @@ modPlay3.setPatternData( patternData, 8 );
 		{
 			inputStream.close();
 		}
-		setNumChannels( modPlay3.getNumChannels() );
+		byte[] patternData = new byte[ ModPlay3.MAX_CHANNELS * 4 * 64 * 128 ];
+		System.arraycopy( modPlay3.getPatternData(), 0, patternData, 0, modPlay3.getPatternData().length );
+		modPlay3.setPatternData( patternData );
 		gadText[ GADNUM_TITLE_TEXTBOX ][ 0 ] = modPlay3.getSongName();
 		gadRedraw[ GADNUM_TITLE_TEXTBOX ] = true;
 		setSeqPos( 0 );
@@ -1692,6 +1696,19 @@ modPlay3.setPatternData( patternData, 8 );
 		gadValue[ GADNUM_DIR_SLIDER ] = 0;
 		setInstrument( 1 );
 		stop();
+	}
+	
+	private void save() throws IOException
+	{
+		FileOutputStream outputStream = new FileOutputStream( "out.mod" );
+		try
+		{
+			modPlay3.writeModule( outputStream );
+		}
+		finally
+		{
+			outputStream.close();
+		}
 	}
 	
 	private synchronized int getAudio( int sampleRate, int[] output )
