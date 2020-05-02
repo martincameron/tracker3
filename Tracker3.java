@@ -320,12 +320,12 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 
 		gadRedraw[ 0 ] = true;
 
-byte[] patternData = new byte[ ModPlay3.MAX_CHANNELS * 4 * 64 * 128 ];
+byte[] patternData = new byte[ 8 * 4 * 64 * 128 ];
 patternData[ 0 ] = 0x01;
 patternData[ 1 ] = 0x1F;
 patternData[ 2 ] = 0x0C;
 patternData[ 3 ] = 0x40;
-modPlay3.setPatternData( patternData );
+modPlay3.setPatternData( patternData, 8 );
 	}
 	
 	public synchronized void keyPressed( KeyEvent e )
@@ -1037,9 +1037,9 @@ modPlay3.setPatternData( patternData );
 		gadValue[ listbox ] = gadValue[ slider ];
 	}
 	
-	private String getNote( int pat, int row, int channel )
+	private String getNote( int pat, int row, int chn )
 	{
-		int offset = ( ( pat * 64 + row ) * ModPlay3.MAX_CHANNELS + channel ) * 4;
+		int offset = ( ( pat * 64 + row ) * 8 + chn ) * 4;
 		byte[] patternData = modPlay3.getPatternData();
 		int key = patternData[ offset ] & 0xFF;
 		int instrument = patternData[ offset + 1 ] & 0xFF;
@@ -1613,7 +1613,7 @@ modPlay3.setPatternData( patternData );
 	private void setNumChannels( int numChannels )
 	{
 		modPlay3.setNumChannels( numChannels );
-		for( int chn = numChannels; chn < ModPlay3.MAX_CHANNELS; chn++ )
+		for( int chn = numChannels; chn < 8; chn++ )
 		{
 			modPlay3.trigger( chn, 0, 0, 0 );
 		}
@@ -1622,9 +1622,9 @@ modPlay3.setPatternData( patternData );
 	
 	private void deletePattern( int pat )
 	{
-		byte[] patternData = modPlay3.getPatternData();
-		int patLen = ModPlay3.MAX_CHANNELS * 4 * 64;
+		int patLen = 8 * 4 * 64;
 		int offset = ( pat + 1 ) * patLen;
+		byte[] patternData = modPlay3.getPatternData();
 		System.arraycopy( patternData, offset, patternData, offset - patLen, patternData.length - offset );
 		byte[] sequence = new byte[ modPlay3.getSongLength() ];
 		for( int pos = 0; pos < sequence.length; pos++ )
@@ -1642,35 +1642,39 @@ modPlay3.setPatternData( patternData );
 	private void optimize()
 	{
 		boolean[] patternUsed = new boolean[ 128 ];
+		int numPatterns = 0;
 		int songLength = modPlay3.getSongLength();
-		int patCount = 0;
 		for( int pos = 0; pos < songLength; pos++ )
 		{
 			int pat = modPlay3.getPattern( pos );
-			if( patCount <= pat )
+			if( numPatterns <= pat )
 			{
-				patCount = pat + 1;
+				numPatterns = pat + 1;
 			}
 			patternUsed[ pat ] = true;
 		}
 		int deleted = 0;
-		for( int idx = 0; idx < patCount; idx++ )
+		for( int pat = 0; pat < numPatterns; pat++ )
 		{
-			if( !patternUsed[ idx ] )
+			if( !patternUsed[ pat ] )
 			{
-				deletePattern( idx - deleted );
+				deletePattern( pat - deleted );
 				deleted++;
 			}
 		}
 		boolean[] instrumentUsed = new boolean[ 32 ];
 		byte[] patternData = modPlay3.getPatternData();
-		int numRows = patternData.length / ( ModPlay3.MAX_CHANNELS * 4 );
+		int numRows = ( numPatterns - deleted ) * 64;
 		int numChannels = modPlay3.getNumChannels();
 		for( int row = 0; row < numRows; row++ )
 		{
 			for( int chn = 0; chn < numChannels; chn++ )
 			{
-				instrumentUsed[ patternData[ ( row * ModPlay3.MAX_CHANNELS + chn ) * 4 + 1 ] & 0x1F ] = true;
+				int ins = patternData[ ( row * 8 + chn ) * 4 + 1 ] & 0xFF;
+				if( ins < 32 )
+				{
+					instrumentUsed[ ins ] = true;
+				}
 			}
 		}
 		for( int idx = 1; idx < instrumentUsed.length; idx++ )
@@ -1695,9 +1699,15 @@ modPlay3.setPatternData( patternData );
 		{
 			inputStream.close();
 		}
-		byte[] patternData = new byte[ ModPlay3.MAX_CHANNELS * 4 * 64 * 128 ];
-		System.arraycopy( modPlay3.getPatternData(), 0, patternData, 0, modPlay3.getPatternData().length );
-		modPlay3.setPatternData( patternData );
+		byte[] newPatternData = new byte[ 8 * 4 * 64 * 128 ];
+		byte[] patternData = modPlay3.getPatternData();
+		int rowLength = modPlay3.getNumChannels() * 4;
+		int numRows = patternData.length / rowLength;
+		for( int row = 0; row < numRows; row++ )
+		{
+			System.arraycopy( patternData, row * rowLength, newPatternData, row * 8 * 4, rowLength );
+		}
+		modPlay3.setPatternData( newPatternData, 8 );
 		gadText[ GADNUM_TITLE_TEXTBOX ][ 0 ] = modPlay3.getSongName();
 		gadRedraw[ GADNUM_TITLE_TEXTBOX ] = true;
 		setSeqPos( 0 );

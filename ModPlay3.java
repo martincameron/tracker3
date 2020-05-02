@@ -1,8 +1,8 @@
 
 public class ModPlay3
 {
-	public static final int MAX_CHANNELS = 8;
 	private static final int MAX_SAMPLES = 32;
+	private static final int MAX_CHANNELS = 8;
 	private static final int FIXED_POINT_SHIFT = 13;
 	private static final int FIXED_POINT_ONE = 1 << FIXED_POINT_SHIFT;
 	
@@ -38,8 +38,8 @@ public class ModPlay3
 	private String songName;
 	private String[] instrumentNames = new String[ MAX_SAMPLES ];
 	private int numChannels;
+	private int patChannels;
 	private int songLength;
-	private int numPatterns;
 	private int c2Rate;
 	private byte[] sequence;
 	private byte[] patternData;
@@ -95,7 +95,7 @@ public class ModPlay3
 		songLength = 1;
 		sequence = new byte[ 1 ];
 		setNumChannels( numChannels );
-		setPatternData( new byte[ MAX_CHANNELS * 4 * 64 ] );
+		setPatternData( new byte[ numChannels * 4 * 64 ], numChannels );
 		setSequencePos( 0, 0 );
 	}
 	
@@ -130,77 +130,69 @@ public class ModPlay3
 			songLength = 1;
 		}
 		int restart = moduleData.read() & 0x7F;
-		int patterns = 0;
+		int numPatterns = 0;
 		sequence = readBytes( moduleData, 128 );
 		for( int idx = 0; idx < 128; idx++ )
 		{
-			if( patterns < sequence[ idx ] + 1 ) 
+			if( numPatterns < sequence[ idx ] + 1 ) 
 			{
-				patterns = sequence[ idx ] + 1;
+				numPatterns = sequence[ idx ] + 1;
 			}
 		}
-		int channels = 0;
 		String modType = soundtracker ? "M.K." : readString( moduleData, 4 );
 		if( modType.equals( "M.K." ) || modType.equals( "M!K!" ) || modType.equals( "FLT4" ) )
 		{
-			channels = 4;
+			setNumChannels( 4 );
 		}
 		else if( modType.equals( "CD81" ) || modType.equals( "OKTA" ) )
 		{
-			channels = 8;
+			setNumChannels( 8 );
 		}
 		else if( modType.length() > 0 && modType.substring( 1 ).equals( "CHN" ) )
 		{
-			channels = modType.charAt( 0 ) - '0';
+			setNumChannels( modType.charAt( 0 ) - '0' );
 		}
-		if( channels < 1 || channels > MAX_CHANNELS )
+		if( numChannels < 1 || numChannels > MAX_CHANNELS )
 		{
 			throw new IllegalArgumentException( "Module not recognised!" );
 		}
-		setNumChannels( channels );
-		byte[] inputData = readBytes( moduleData, channels * 4 * 64 * patterns );
-		byte[] outputData = new byte[ MAX_CHANNELS * 4 * 64 * patterns ];
-		for( int row = 0, rows = patterns * 64; row < rows; row++ )
+		setPatternData( readBytes( moduleData, numChannels * 4 * 64 * numPatterns ), numChannels );
+		for( int idx = 0; idx < patternData.length; idx += 4 )
 		{
-			for( int chn = 0; chn < channels; chn++ )
+			int key = periodToKey( ( ( patternData[ idx ] & 0xF ) << 8 ) | ( patternData[ idx + 1 ] & 0xFF ) );
+			int instrument = ( soundtracker ? 0 : patternData[ idx ] & 0x10 ) | ( ( patternData[ idx + 2 ] >> 4 ) & 0xF );
+			int effect = patternData[ idx + 2 ] & 0xF;
+			int param1 = ( patternData[ idx + 3 ] >> 4 ) & 0xF;
+			int param2 = patternData[ idx + 3 ] & 0xF;
+			if( soundtracker )
 			{
-				int inIdx = ( row * channels + chn ) * 4;
-				int outIdx = ( row * MAX_CHANNELS + chn ) * 4;
-				int key = periodToKey( ( ( inputData[ inIdx ] & 0xF ) << 8 ) | ( inputData[ inIdx + 1 ] & 0xFF ) );
-				int instrument = ( soundtracker ? 0 : inputData[ inIdx ] & 0x10 ) | ( ( inputData[ inIdx + 2 ] >> 4 ) & 0xF );
-				int effect = inputData[ inIdx + 2 ] & 0xF;
-				int param1 = ( inputData[ inIdx + 3 ] >> 4 ) & 0xF;
-				int param2 = inputData[ inIdx + 3 ] & 0xF;
-				if( soundtracker )
+				if( effect == 1 )
 				{
-					if( effect == 1 )
-					{
-						effect = 0;
-					}
-					else if( effect == 2 && ( param1 - param2 ) < 0 )
-					{
-						effect = 1;
-						param2 = param2 - param1;
-						param1 = 0;
-					} 
-					else if( effect == 2 )
-					{
-						effect = 2;
-						param2 = param1 - param2;
-						param1 = 0;
-					}
-					else
-					{
-						effect = param1 = param2 = 0;
-					}
+					effect = 0;
 				}
-				outputData[ outIdx ] = ( byte ) key;
-				outputData[ outIdx + 1 ] = ( byte ) instrument;
-				outputData[ outIdx + 2 ] = ( byte ) effect;
-				outputData[ outIdx + 3 ] = ( byte ) ( ( param1 << 4 ) | ( param2 & 0xF ) );
+				else if( effect == 2 && ( param1 - param2 ) < 0 )
+				{
+					effect = 1;
+					param2 = param2 - param1;
+					param1 = 0;
+				} 
+				else if( effect == 2 )
+				{
+					effect = 2;
+					param2 = param1 - param2;
+					param1 = 0;
+				}
+				else
+				{
+					effect = param1 = param2 = 0;
+				}
 			}
+			patternData[ idx ] = ( byte ) key;
+			patternData[ idx + 1 ] = ( byte ) instrument;
+			patternData[ idx + 2 ] = ( byte ) effect;
+			patternData[ idx + 3 ] = ( byte ) ( ( param1 << 4 ) | ( param2 & 0xF ) );
 		}
-		setPatternData( outputData );
+		
 		for( int idx = 1; idx < numSamples; idx++ )
 		{
 			sampleData[ idx ] = readBytes( moduleData, sampleLengths[ idx ] );
@@ -234,17 +226,17 @@ public class ModPlay3
 		}
 		header[ 950 ] = ( byte ) songLength;
 		System.arraycopy( sequence, 0, header, 952, songLength );
-		int patterns = 0;
+		int numPatterns = 0;
 		for( int idx = 0; idx < songLength; idx++ )
 		{
-			if( patterns <= sequence[ idx ] ) 
+			if( numPatterns <= sequence[ idx ] ) 
 			{
-				patterns = sequence[ idx ] + 1;
+				numPatterns = sequence[ idx ] + 1;
 			}
 		}
 		if( numChannels == 4 )
 		{
-			writeAscii( patterns > 64 ? "M!K!" : "M.K.", header, 1080, 4 );
+			writeAscii( numPatterns > 64 ? "M!K!" : "M.K.", header, 1080, 4 );
 		}
 		else
 		{
@@ -252,12 +244,12 @@ public class ModPlay3
 			writeAscii( "CHN", header, 1081, 3 );
 		}
 		outputStream.write( header );
-		byte[] outputData = new byte[ numChannels * 4 * 64 * patterns ];
-		for( int row = 0, rows = patterns * 64; row < rows; row++ )
+		byte[] outputData = new byte[ numChannels * 4 * 64 * numPatterns ];
+		for( int row = 0, rows = numPatterns * 64; row < rows; row++ )
 		{
 			for( int chn = 0; chn < numChannels; chn++ )
 			{
-				int patIdx = ( row * MAX_CHANNELS + chn ) * 4;
+				int patIdx = ( row * patChannels + chn ) * 4;
 				int outIdx = ( row * numChannels + chn ) * 4;
 				int period = keyToPeriod( patternData[ patIdx ] & 0xFF, 0 );
 				int instrument = patternData[ patIdx + 1 ] & 0x1F;
@@ -388,10 +380,14 @@ public class ModPlay3
 		return patternData;
 	}
 	
-	public void setPatternData( byte[] patternData )
+	public void setPatternData( byte[] patternData, int patChannels )
 	{
 		this.patternData = patternData;
-		this.numPatterns = patternData.length / ( MAX_CHANNELS * 4 * 64 );
+		this.patChannels = patChannels;
+		if( numChannels > patChannels )
+		{
+			setNumChannels( patChannels );
+		}
 	}
 	
 	public int getRow()
@@ -629,7 +625,7 @@ public class ModPlay3
 		for( int chn = 0; chn < numChannels; chn++ )
 		{
 			int rowOffset = sequence[ currentSequencePos ] * 64 + currentRow;
-			int patternDataOffset = ( rowOffset * MAX_CHANNELS + chn ) * 4;
+			int patternDataOffset = ( rowOffset * patChannels + chn ) * 4;
 			int key = patternData[ patternDataOffset ] & 0xFF;
 			int instrument = patternData[ patternDataOffset + 1 ] & 0xFF;
 			int effect = patternData[ patternDataOffset + 2 ] & 0xF;
