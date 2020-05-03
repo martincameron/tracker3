@@ -1825,6 +1825,7 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 				if( seqPos != getSeqPos() && ( dt < 0 || dt > 500 ) )
 				{
 					setSeqPos( seqPos );
+					gadValue[ GADNUM_SEQ_SLIDER ] = seqPos - 3;
 				}
 				setRow( row );
 				repaint();
