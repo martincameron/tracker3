@@ -366,7 +366,7 @@ public class ModPlay3
 	
 	public int getPattern( int sequencePos )
 	{
-		return sequence[ sequencePos ];
+		return sequencePos < songLength ? sequence[ sequencePos ] : 0;
 	}
 	
 	public void setSequence( byte[] sequence )

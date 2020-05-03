@@ -175,6 +175,8 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private static final int KEY_DELETE = KeyEvent.VK_DELETE;
 	private static final int KEY_END = KeyEvent.VK_END;
 	private static final int KEY_ESCAPE = KeyEvent.VK_ESCAPE;
+	private static final int KEY_PAGE_UP = KeyEvent.VK_PAGE_UP;
+	private static final int KEY_PAGE_DOWN = KeyEvent.VK_PAGE_DOWN;
 	private static final int KEY_HOME = KeyEvent.VK_HOME;
 	private static final int KEY_UP = KeyEvent.VK_UP;
 	private static final int KEY_DOWN = KeyEvent.VK_DOWN;
@@ -213,6 +215,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private static final int GADNUM_VER_LABEL = 31;
 	private static final int GADNUM_PLAY_BUTTON = 32;
 	
+	private static final int MAX_CHANNELS = 8;
 	private static final int SAMPLING_RATE = 48000;
 
 	private int width, height, clickX, clickY, focus;
@@ -234,7 +237,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	
 	private Image charset, image;
 	
-	private ModPlay3 modPlay3 = new ModPlay3( 8 );
+	private ModPlay3 modPlay3 = new ModPlay3( MAX_CHANNELS );
 	private int instrument, selectedFile;
 	
 	private static Color toColor( int rgb12 )
@@ -320,12 +323,12 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 
 		gadRedraw[ 0 ] = true;
 
-byte[] patternData = new byte[ 8 * 4 * 64 * 128 ];
+byte[] patternData = new byte[ MAX_CHANNELS * 4 * 64 * 128 ];
 patternData[ 0 ] = 0x01;
 patternData[ 1 ] = 0x1F;
 patternData[ 2 ] = 0x0C;
 patternData[ 3 ] = 0x40;
-modPlay3.setPatternData( patternData, 8 );
+modPlay3.setPatternData( patternData, MAX_CHANNELS );
 	}
 	
 	public synchronized void keyPressed( KeyEvent e )
@@ -333,7 +336,7 @@ modPlay3.setPatternData( patternData, 8 );
 		switch( e.getKeyCode() )
 		{
 			case KeyEvent.VK_F8:
-				setNumChannels( modPlay3.getNumChannels() < 8 ? 8 : 4 );
+				setNumChannels( modPlay3.getNumChannels() < MAX_CHANNELS ? MAX_CHANNELS : 4 );
 				break;
 			case KeyEvent.VK_F10:
 				if( e.isShiftDown() )
@@ -349,6 +352,9 @@ modPlay3.setPatternData( patternData, 8 );
 						break;
 					case GAD_TYPE_LISTBOX:
 						keyListbox( focus, e.getKeyChar(), e.getKeyCode() );
+						break;
+					case GAD_TYPE_PATTERN:
+						keyPattern( focus, e.getKeyChar(), e.getKeyCode() );
 						break;
 				}
 				break;
@@ -1039,7 +1045,7 @@ modPlay3.setPatternData( patternData, 8 );
 	
 	private String getNote( int pat, int row, int chn )
 	{
-		int offset = ( ( pat * 64 + row ) * 8 + chn ) * 4;
+		int offset = ( ( pat * 64 + row ) * MAX_CHANNELS + chn ) * 4;
 		byte[] patternData = modPlay3.getPatternData();
 		int key = patternData[ offset ] & 0xFF;
 		int instrument = patternData[ offset + 1 ] & 0xFF;
@@ -1061,11 +1067,11 @@ modPlay3.setPatternData( patternData, 8 );
 	{
 		int numChannels = modPlay3.getNumChannels();
 		byte[] patternData = modPlay3.getPatternData();
-		int pos = modPlay3.getSequencePos();
-		int pat = modPlay3.getPattern( pos < modPlay3.getSongLength() ? pos : 0 );
+		int pat = modPlay3.getPattern( modPlay3.getSequencePos() );
 		int mute = modPlay3.getMute();
 		int x = gadX[ gadnum ];
 		int y = gadY[ gadnum ];
+		int selPat = ( gadItem[ gadnum ] >> 24 ) & 0xFF;
 		int selChan = ( gadItem[ gadnum ] >> 16 ) & 0xFF;
 		int selRow = ( gadItem[ gadnum ] >> 8 ) & 0xFF;
 		int selCol = gadItem[ gadnum ] & 0xFF;
@@ -1080,7 +1086,7 @@ modPlay3.setPatternData( patternData, 8 );
 		}
 		drawInt( g, x, y, pat, 3, 7 );
 		drawText( g, x + 3 * 8, y, " ", 7 );
-		for( int c = 0; c < 8; c++ )
+		for( int c = 0; c < MAX_CHANNELS; c++ )
 		{
 			int clr = ( ( mute >> c ) & 1 ) > 0 ? TEXT_RED : TEXT_BLUE;
 			drawText( g, x + ( c * 9 + 4 ) * 8, y, clr == TEXT_RED ? " Muted   " : "Channel  ", clr );
@@ -1130,7 +1136,7 @@ modPlay3.setPatternData( patternData, 8 );
 						drawText( g, x + ( c * 9 + 9 ) * 8, y + r * 16, note.substring( 5, 8 ), clr + hl );
 						drawText( g, x + ( c * 9 + 12 ) * 8, y + r * 16, " ", clr + hl );
 					}
-					if( selChan == c + 1 && selRow == dr )
+					if( selPat == pat && selChan == c + 1 && selRow == dr )
 					{
 						int bx = c * 9 + 4;
 						int bw = 8;
@@ -1146,10 +1152,10 @@ modPlay3.setPatternData( patternData, 8 );
 						g.fillRect( x + ( bx + bw ) * 8, y + r * 16 - 1, 1, 16 );
 					}
 				}
-				if( numChannels < 8 )
+				if( numChannels < MAX_CHANNELS )
 				{
 					g.setColor( Color.BLACK );
-					g.fillRect( x + ( numChannels * 9 + 4 ) * 8, y + r * 16, ( 8 - numChannels ) * 9 * 8, 16 );
+					g.fillRect( x + ( numChannels * 9 + 4 ) * 8, y + r * 16, ( MAX_CHANNELS - numChannels ) * 9 * 8, 16 );
 				}
 			}
 		}
@@ -1157,6 +1163,7 @@ modPlay3.setPatternData( patternData, 8 );
 	
 	private void clickPattern( int gadnum )
 	{
+		gadItem[ gadnum ] = 0;
 		int row = ( clickY - gadY[ gadnum ] ) / 16;
 		int col = ( clickX - gadX[ gadnum ] ) / 8;
 		int chn = ( col - 4 ) / 9;
@@ -1181,14 +1188,76 @@ modPlay3.setPatternData( patternData, 8 );
 			row = gadValue[ gadnum ] + row - 8;
 			if( col > 3 && row >= 0 && row < 64 && chn < modPlay3.getNumChannels() )
 			{
-				gadItem[ gadnum ] = ( ( chn + 1 ) << 16 ) | ( row << 8 ) | ( col - chn * 9 - 4 );
-			}
-			else
-			{
-				gadItem[ gadnum ] = 0;
+				int pat = modPlay3.getPattern( modPlay3.getSequencePos() );
+				gadItem[ gadnum ] = ( pat << 24 ) | ( ( chn + 1 ) << 16 ) | ( row << 8 ) | ( col - chn * 9 - 4 );
 			}
 		}
 		gadRedraw[ GADNUM_PATTERN ] = true;
+	}
+	
+	private void keyPattern( int gadnum, char chr, int key )
+	{
+		int pat = ( gadItem[ gadnum ] >> 24 ) & 0xFF;
+		int chn = ( gadItem[ gadnum ] >> 16 ) & 0xFF;
+		int row = ( gadItem[ gadnum ] >> 8 ) & 0xFF;
+		int col = gadItem[ gadnum ] & 0xFF;
+		if( chn > 0 && pat == modPlay3.getPattern( modPlay3.getSequencePos() ) )
+		{
+			switch( key )
+			{
+				case KEY_PAGE_UP:
+					row = row - 6;
+				case KEY_UP:
+					row = row > 0 ? row - 1 : 0;
+					if( gadValue[ GADNUM_PATTERN_SLIDER ] - 7 > row )
+					{
+						gadValue[ GADNUM_PATTERN_SLIDER ] = row + 7;
+					}
+					break;
+				case KEY_PAGE_DOWN:
+					row = row + 6;
+				case KEY_DOWN:
+					row = row < 63 ? row + 1 : 63;
+					if( gadValue[ GADNUM_PATTERN_SLIDER ] + 7 < row )
+					{
+						gadValue[ GADNUM_PATTERN_SLIDER ] = row - 7;
+					}
+					break;
+				case KEY_LEFT:
+					if( col > 3 )
+					{
+						col = col - 1;
+					}
+					else if( col == 3 )
+					{
+						col = 0;
+					}
+					else if( chn > 1 )
+					{
+						chn = chn - 1;
+						col = 7;
+					}
+					break;
+				case KEY_RIGHT:
+					if( col < 3 )
+					{
+						col = 3;
+					}
+					else if( col < 7 )
+					{
+						col = col + 1;
+					}
+					else if( chn < MAX_CHANNELS )
+					{
+						chn = chn + 1;
+						col = 0;
+					}
+					break;
+			}
+			gadItem[ gadnum ] = ( pat << 24 ) | ( chn << 16 ) | ( row << 8 ) | col;
+			gadRedraw[ gadnum ] = true;
+		}
+		
 	}
 	
 	private int findGadget( int x, int y )
@@ -1370,14 +1439,11 @@ modPlay3.setPatternData( patternData, 8 );
 					if( modPlay3.getSequencer() )
 					{
 						stop();
-						gadText[ GADNUM_PLAY_BUTTON ][ 0 ] = "Play";
 					}
 					else
 					{
 						play();
-						gadText[ GADNUM_PLAY_BUTTON ][ 0 ] = "Stop";
 					}
-					gadRedraw[ GADNUM_PLAY_BUTTON ] = true;
 					break;
 				default:
 					System.out.println( gadnum );
@@ -1605,21 +1671,25 @@ modPlay3.setPatternData( patternData, 8 );
 	{
 		modPlay3.setSequencer( true );
 		modPlay3.seek( getSeqPos(), gadValue[ GADNUM_PATTERN ], SAMPLING_RATE );
+		gadText[ GADNUM_PLAY_BUTTON ][ 0 ] = "Stop";
+		gadRedraw[ GADNUM_PLAY_BUTTON ] = true;
 	}
 	
 	private void stop()
 	{
 		modPlay3.setSequencer( false );
-		for( int idx = 0; idx < 8; idx ++ )
+		for( int idx = 0; idx < MAX_CHANNELS; idx ++ )
 		{
 			modPlay3.trigger( idx, 0, 0, 0 );
 		}
+		gadText[ GADNUM_PLAY_BUTTON ][ 0 ] = "Play";
+		gadRedraw[ GADNUM_PLAY_BUTTON ] = true;
 	}
 	
 	private void setNumChannels( int numChannels )
 	{
 		modPlay3.setNumChannels( numChannels );
-		for( int chn = numChannels; chn < 8; chn++ )
+		for( int chn = numChannels; chn < MAX_CHANNELS; chn++ )
 		{
 			modPlay3.trigger( chn, 0, 0, 0 );
 		}
@@ -1628,7 +1698,7 @@ modPlay3.setPatternData( patternData, 8 );
 	
 	private void deletePattern( int pat )
 	{
-		int patLen = 8 * 4 * 64;
+		int patLen = MAX_CHANNELS * 4 * 64;
 		int offset = ( pat + 1 ) * patLen;
 		byte[] patternData = modPlay3.getPatternData();
 		System.arraycopy( patternData, offset, patternData, offset - patLen, patternData.length - offset );
@@ -1676,7 +1746,7 @@ modPlay3.setPatternData( patternData, 8 );
 		{
 			for( int chn = 0; chn < numChannels; chn++ )
 			{
-				int ins = patternData[ ( row * 8 + chn ) * 4 + 1 ] & 0xFF;
+				int ins = patternData[ ( row * MAX_CHANNELS + chn ) * 4 + 1 ] & 0xFF;
 				if( ins < 32 )
 				{
 					instrumentUsed[ ins ] = true;
@@ -1705,15 +1775,15 @@ modPlay3.setPatternData( patternData, 8 );
 		{
 			inputStream.close();
 		}
-		byte[] newPatternData = new byte[ 8 * 4 * 64 * 128 ];
+		byte[] newPatternData = new byte[ MAX_CHANNELS * 4 * 64 * 128 ];
 		byte[] patternData = modPlay3.getPatternData();
 		int rowLength = modPlay3.getNumChannels() * 4;
 		int numRows = patternData.length / rowLength;
 		for( int row = 0; row < numRows; row++ )
 		{
-			System.arraycopy( patternData, row * rowLength, newPatternData, row * 8 * 4, rowLength );
+			System.arraycopy( patternData, row * rowLength, newPatternData, row * MAX_CHANNELS * 4, rowLength );
 		}
-		modPlay3.setPatternData( newPatternData, 8 );
+		modPlay3.setPatternData( newPatternData, MAX_CHANNELS );
 		gadText[ GADNUM_TITLE_TEXTBOX ][ 0 ] = modPlay3.getSongName();
 		gadRedraw[ GADNUM_TITLE_TEXTBOX ] = true;
 		setSeqPos( 0 );
