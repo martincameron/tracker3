@@ -1389,9 +1389,11 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 					break;
 				case GADNUM_INST_INC_BUTTON:
 					setInstrument( instrument + 1 );
+					gadValue[ GADNUM_DIR_SLIDER ] = instrument - 4;
 					break;
 				case GADNUM_INST_DEC_BUTTON:
 					setInstrument( instrument - 1 );
+					gadValue[ GADNUM_DIR_SLIDER ] = instrument - 4;
 					break;
 				case GADNUM_INST_NAME_TEXTBOX:
 					modPlay3.setInstrumentName( instrument, gadText[ gadnum ][ 0 ] );
