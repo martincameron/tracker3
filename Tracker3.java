@@ -239,6 +239,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	
 	private ModPlay3 modPlay3 = new ModPlay3( MAX_CHANNELS );
 	private int instrument, selectedFile;
+	private boolean reverb;
 	
 	private static Color toColor( int rgb12 )
 	{
@@ -337,6 +338,9 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 		{
 			case KeyEvent.VK_F8:
 				setNumChannels( modPlay3.getNumChannels() < MAX_CHANNELS ? MAX_CHANNELS : 4 );
+				break;
+			case KeyEvent.VK_F9:
+				reverb = !reverb;
 				break;
 			case KeyEvent.VK_F10:
 				if( e.isShiftDown() )
@@ -1787,6 +1791,7 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 		gadText[ GADNUM_TITLE_TEXTBOX ][ 0 ] = modPlay3.getSongName();
 		gadRedraw[ GADNUM_TITLE_TEXTBOX ] = true;
 		setSeqPos( 0 );
+		gadValue[ GADNUM_SEQ_SLIDER ] = 0;
 		setRow( 0 );
 		byte[] sequence = new byte[ modPlay3.getSongLength() ];
 		for( int seqPos = 0; seqPos < sequence.length; seqPos++ )
@@ -1810,6 +1815,11 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 		{
 			outputStream.close();
 		}
+	}
+	
+	private boolean getReverb()
+	{
+		return reverb;
 	}
 	
 	private synchronized int getAudio( int sampleRate, int[] output )
@@ -1880,7 +1890,10 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 					offset += count;
 				}
 				ModPlay3.downsample( downsampleBuf, DOWNSAMPLE_BUF_SAMPLES / 2, FILTER_COEFFS );
-				reverbIdx = ModPlay3.reverb( downsampleBuf, reverbBuf, reverbIdx, DOWNSAMPLE_BUF_SAMPLES / 2 );
+				if( tracker3.getReverb() )
+				{
+					reverbIdx = ModPlay3.reverb( downsampleBuf, reverbBuf, reverbIdx, DOWNSAMPLE_BUF_SAMPLES / 2 );
+				}
 				ModPlay3.clip( downsampleBuf, outBuf, DOWNSAMPLE_BUF_SAMPLES );
 				sourceDataLine.write( outBuf, 0, DOWNSAMPLE_BUF_SAMPLES * 2 );
 			}
