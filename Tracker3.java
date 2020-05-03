@@ -235,7 +235,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private Image charset, image;
 	
 	private ModPlay3 modPlay3 = new ModPlay3( 8 );
-	private int instrument;
+	private int instrument, selectedFile;
 	
 	private static Color toColor( int rgb12 )
 	{
@@ -1270,9 +1270,12 @@ modPlay3.setPatternData( patternData, 8 );
 		{
 			switch( gadnum ) 
 			{
-				case GADNUM_DIR_BUTTON:
 				case GADNUM_DIR_TEXTBOX:
+					selectedFile = 0;
+				case GADNUM_DIR_BUTTON:
 					getDir( new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] ) );
+					gadItem[ GADNUM_DIR_LISTBOX ] = selectedFile;
+					gadValue[ GADNUM_DIR_SLIDER ] = selectedFile - 3;
 					break;
 				case GADNUM_LOAD_BUTTON:
 				case GADNUM_DIR_LISTBOX:
@@ -1288,15 +1291,18 @@ modPlay3.setPatternData( patternData, 8 );
 							file = new File( file, gadText[ GADNUM_DIR_LISTBOX ][ gadItem[ GADNUM_DIR_LISTBOX ] ].substring( 6 ) );
 							if( file.isDirectory() )
 							{
+								selectedFile = 0;
 								getDir( file );
 							}
 							else
 							{
+								selectedFile = gadItem[ GADNUM_DIR_LISTBOX ];
 								load( file );
 							}
 						}
 						else
 						{
+							selectedFile = 0;
 							getDir( file.getParentFile() );
 						}
 					}
