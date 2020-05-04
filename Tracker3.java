@@ -576,6 +576,28 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 		return new Dimension( width, height );
 	}
 	
+	private static void drawChar( long[] source, int chr, int x, int y, int bg, int fg, int[] dest, int stride )
+	{
+		int destIdx = y * stride + x;
+		for( int cy = 7; cy >= 0; cy-- ) {
+			for( int cx = 7; cx >= 0; cx-- ) {
+				int pixel = ( ( source[ chr ] >> cy * 8 + cx ) & 1 ) == 0 ? bg : fg;
+				dest[ destIdx + cx ] = dest[ destIdx + cx + stride ] = pixel;
+			}
+			destIdx += stride * 2;
+		}
+	}
+	
+	private static Image iconImage()
+	{
+		BufferedImage image = new BufferedImage( 24, 24, BufferedImage.TYPE_INT_RGB );
+		int[] pixels = new int[ 24 * 24 ];
+		drawChar( TOPAZ_8, 'T' - 32, 4, 5, 0, toRgb24( 0xF70 ), pixels, 24 );
+		drawChar( TOPAZ_8, '3' - 32, 12, 5, 0, toRgb24( 0x07F ), pixels, 24 );
+		image.setRGB( 0, 0, 24, 24, pixels, 0, 24 );
+		return image;
+	}
+	
 	private static Image charsetImage( long[] source )
 	{
 		int[] pal = new int[]
@@ -595,14 +617,7 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 			int bg = toRgb24( pal[ clr ] >> 12 );
 			int fg = toRgb24( pal[ clr ] & 0xFFF );
 			for( int chr = 0; chr < source.length; chr++ ) {
-				int pixIdx = clr * w * 16 + chr * 8;
-				for( int y = 7; y >= 0; y-- ) {
-					for( int x = 7; x >= 0; x-- ) {
-						int pixel = ( ( source[ chr ] >> y * 8 + x ) & 1 ) == 0 ? bg : fg;
-						pixels[ pixIdx + x ] = pixels[ pixIdx + x + w ] = pixel;
-					}
-					pixIdx += w * 2;
-				}
+				drawChar( source, chr, chr * 8, clr * 16, bg, fg, pixels, w );
 			}
 		}
 		BufferedImage image = new BufferedImage( w, h, BufferedImage.TYPE_INT_RGB );
@@ -1836,6 +1851,7 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 			System.arraycopy( patternData, row * rowLength, newPatternData, row * MAX_CHANNELS * 4, rowLength );
 		}
 		modPlay3.setPatternData( newPatternData, MAX_CHANNELS );
+		gadItem[ GADNUM_PATTERN ] = 0;
 		gadText[ GADNUM_TITLE_TEXTBOX ][ 0 ] = modPlay3.getSongName();
 		gadRedraw[ GADNUM_TITLE_TEXTBOX ] = true;
 		setSeqPos( 0 );
@@ -1896,6 +1912,7 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 	{
 		Tracker3 tracker3 = new Tracker3( 640, 452 );
 		Frame frame = new Frame( VERSION );
+		frame.setIconImage( tracker3.iconImage() );
 		frame.addWindowListener( tracker3 );
 		frame.add( tracker3, BorderLayout.CENTER );
 		frame.pack();
