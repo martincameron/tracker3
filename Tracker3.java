@@ -1245,33 +1245,33 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 					}
 					break;
 				case KEY_LEFT:
-					if( col > 3 )
+					if( col == 0 || shift )
+					{
+						chn = chn > 1 ? chn - 1 : 1;
+						col = 7;
+					}
+					else if( col > 3 )
 					{
 						col = col - 1;
 					}
-					else if( col == 3 )
+					else
 					{
 						col = 0;
-					}
-					else if( chn > 1 && !shift )
-					{
-						chn = chn - 1;
-						col = 7;
 					}
 					break;
 				case KEY_RIGHT:
-					if( col < 3 )
+					if( col > 6 || shift )
 					{
-						col = 3;
+						chn = chn < MAX_CHANNELS ? chn + 1 : MAX_CHANNELS;
+						col = 0;
 					}
-					else if( col < 7 )
+					else if( col > 2 )
 					{
 						col = col + 1;
 					}
-					else if( chn < MAX_CHANNELS && !shift )
+					else
 					{
-						chn = chn + 1;
-						col = 0;
+						col = 3;
 					}
 					break;
 			}
