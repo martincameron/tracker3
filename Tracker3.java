@@ -393,6 +393,7 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 		int clicked = findGadget( clickX, clickY );
 		if( focus > 0 && focus != clicked )
 		{
+			escape( focus );
 			gadRedraw[ focus ] = true;
 		}
 		switch( gadType[ clicked ] )
@@ -1335,6 +1336,27 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 	
 	private void escape( int gadnum )
 	{
+		switch( gadnum )
+		{
+			case GADNUM_TITLE_TEXTBOX:
+				gadText[ gadnum ][ 0 ] = modPlay3.getSongName();
+				break;
+			case GADNUM_INST_NAME_TEXTBOX:
+				gadText[ gadnum ][ 0 ] = modPlay3.getInstrumentName( instrument );
+				break;
+			case GADNUM_INST_REP_TEXTBOX:
+				gadText[ gadnum ][ 0 ] = String.valueOf( modPlay3.getSampleLoopStart( instrument ) );
+				break;
+			case GADNUM_INST_VOL_TEXTBOX:
+				gadText[ gadnum ][ 0 ] = String.valueOf( modPlay3.getSampleVolume( instrument ) );
+				break;
+			case GADNUM_INST_LEN_TEXTBOX:
+				gadText[ gadnum ][ 0 ] = String.valueOf( modPlay3.getSampleLoopLength( instrument ) );
+				break;
+			case GADNUM_INST_FINE_TEXTBOX:
+				gadText[ gadnum ][ 0 ] = String.valueOf( modPlay3.getSampleFinetune( instrument ) );
+				break;
+		}
 	}
 	
 	private void action( int gadnum )
