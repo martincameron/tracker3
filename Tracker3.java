@@ -171,13 +171,13 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private static final int GAD_TYPE_LISTBOX = 5;
 	private static final int GAD_TYPE_PATTERN = 6;
 
+	private static final int KEY_ESCAPE = KeyEvent.VK_ESCAPE;
 	private static final int KEY_BACKSPACE = KeyEvent.VK_BACK_SPACE;
 	private static final int KEY_DELETE = KeyEvent.VK_DELETE;
+	private static final int KEY_HOME = KeyEvent.VK_HOME;
 	private static final int KEY_END = KeyEvent.VK_END;
-	private static final int KEY_ESCAPE = KeyEvent.VK_ESCAPE;
 	private static final int KEY_PAGE_UP = KeyEvent.VK_PAGE_UP;
 	private static final int KEY_PAGE_DOWN = KeyEvent.VK_PAGE_DOWN;
-	private static final int KEY_HOME = KeyEvent.VK_HOME;
 	private static final int KEY_UP = KeyEvent.VK_UP;
 	private static final int KEY_DOWN = KeyEvent.VK_DOWN;
 	private static final int KEY_LEFT = KeyEvent.VK_LEFT;
@@ -358,7 +358,7 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 						keyListbox( focus, e.getKeyChar(), e.getKeyCode() );
 						break;
 					case GAD_TYPE_PATTERN:
-						keyPattern( focus, e.getKeyChar(), e.getKeyCode() );
+						keyPattern( focus, e.getKeyChar(), e.getKeyCode(), e.isShiftDown() );
 						break;
 				}
 				break;
@@ -1078,8 +1078,9 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 		int y = gadY[ gadnum ];
 		int selPat = ( gadItem[ gadnum ] >> 24 ) & 0xFF;
 		int selChan = ( gadItem[ gadnum ] >> 16 ) & 0xFF;
-		int selRow = ( gadItem[ gadnum ] >> 8 ) & 0xFF;
-		int selCol = gadItem[ gadnum ] & 0xFF;
+		int selRow1 = ( gadItem[ gadnum ] >> 10 ) & 0x3F;
+		int selRow2 = ( gadItem[ gadnum ] >> 4 ) & 0x3F;
+		int selCol = gadItem[ gadnum ] & 0xF;
 		if( gadLink[ gadnum ] > 0 )
 		{
 			gadValue[ gadnum ] = gadValue[ gadLink[ gadnum ] ];
@@ -1141,7 +1142,7 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 						drawText( g, x + ( c * 9 + 9 ) * 8, y + r * 16, note.substring( 5, 8 ), clr + hl );
 						drawText( g, x + ( c * 9 + 12 ) * 8, y + r * 16, " ", clr + hl );
 					}
-					if( selPat == pat && selChan == c + 1 && selRow == dr )
+					if( selPat == pat && selChan == c + 1 && ( ( dr >= selRow1 && dr <= selRow2 ) || ( dr >= selRow2 && dr <= selRow1 ) ) )
 					{
 						int bx = c * 9 + 4;
 						int bw = 8;
@@ -1152,8 +1153,14 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 						}
 						g.setColor( Color.YELLOW );
 						g.fillRect( x + bx * 8 - 1, y + r * 16 - 1, 1, 16 );
-						g.fillRect( x + bx * 8, y + r * 16 - 2, bw * 8, 1 );
-						g.fillRect( x + bx * 8, y + ( r + 1 ) * 16 - 1, bw * 8, 1 );
+						if( ( selRow2 >= selRow1 && dr == selRow1 ) || ( selRow2 < selRow1 && dr == selRow2 ) ) 
+						{
+							g.fillRect( x + bx * 8, y + r * 16 - 2, bw * 8, 1 );
+						}
+						if( ( selRow2 >= selRow1 && dr == selRow2 ) || ( selRow2 < selRow1 && dr == selRow1 ) ) 
+						{
+							g.fillRect( x + bx * 8, y + ( r + 1 ) * 16 - 1, bw * 8, 1 );
+						}
 						g.fillRect( x + ( bx + bw ) * 8, y + r * 16 - 1, 1, 16 );
 					}
 				}
@@ -1194,38 +1201,47 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 			if( col > 3 && row >= 0 && row < 64 && chn < modPlay3.getNumChannels() )
 			{
 				int pat = modPlay3.getPattern( modPlay3.getSequencePos() );
-				gadItem[ gadnum ] = ( pat << 24 ) | ( ( chn + 1 ) << 16 ) | ( row << 8 ) | ( col - chn * 9 - 4 );
+				gadItem[ gadnum ] = ( pat << 24 ) | ( ( chn + 1 ) << 16 ) | ( row << 10 ) | ( row << 4 ) | ( col - chn * 9 - 4 );
 			}
 		}
 		gadRedraw[ GADNUM_PATTERN ] = true;
 	}
 	
-	private void keyPattern( int gadnum, char chr, int key )
+	private void keyPattern( int gadnum, char chr, int key, boolean shift )
 	{
 		int pat = ( gadItem[ gadnum ] >> 24 ) & 0xFF;
 		int chn = ( gadItem[ gadnum ] >> 16 ) & 0xFF;
-		int row = ( gadItem[ gadnum ] >> 8 ) & 0xFF;
-		int col = gadItem[ gadnum ] & 0xFF;
+		int row1 = ( gadItem[ gadnum ] >> 10 ) & 0x3F;
+		int row2 = ( gadItem[ gadnum ] >> 4 ) & 0x3F;
+		int col = gadItem[ gadnum ] & 0xF;
 		if( chn > 0 && pat == modPlay3.getPattern( modPlay3.getSequencePos() ) )
 		{
 			switch( key )
 			{
+				case KEY_HOME:
+					row2 = 0;
+					gadValue[ GADNUM_PATTERN_SLIDER ] = 0;
+					break;
+				case KEY_END:
+					row2 = 63;
+					gadValue[ GADNUM_PATTERN_SLIDER ] = 63;
+					break;
 				case KEY_PAGE_UP:
-					row = row - 6;
+					row2 = row2 - 6;
 				case KEY_UP:
-					row = row > 0 ? row - 1 : 0;
-					if( gadValue[ GADNUM_PATTERN_SLIDER ] - 7 > row )
+					row2 = row2 > 0 ? row2 - 1 : 0;
+					if( gadValue[ GADNUM_PATTERN_SLIDER ] - 7 > row2 )
 					{
-						gadValue[ GADNUM_PATTERN_SLIDER ] = row + 7;
+						gadValue[ GADNUM_PATTERN_SLIDER ] = row2 + 7;
 					}
 					break;
 				case KEY_PAGE_DOWN:
-					row = row + 6;
+					row2 = row2 + 6;
 				case KEY_DOWN:
-					row = row < 63 ? row + 1 : 63;
-					if( gadValue[ GADNUM_PATTERN_SLIDER ] + 7 < row )
+					row2 = row2 < 63 ? row2 + 1 : 63;
+					if( gadValue[ GADNUM_PATTERN_SLIDER ] + 7 < row2 )
 					{
-						gadValue[ GADNUM_PATTERN_SLIDER ] = row - 7;
+						gadValue[ GADNUM_PATTERN_SLIDER ] = row2 - 7;
 					}
 					break;
 				case KEY_LEFT:
@@ -1237,7 +1253,7 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 					{
 						col = 0;
 					}
-					else if( chn > 1 )
+					else if( chn > 1 && !shift )
 					{
 						chn = chn - 1;
 						col = 7;
@@ -1252,14 +1268,22 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 					{
 						col = col + 1;
 					}
-					else if( chn < MAX_CHANNELS )
+					else if( chn < MAX_CHANNELS && !shift )
 					{
 						chn = chn + 1;
 						col = 0;
 					}
 					break;
 			}
-			gadItem[ gadnum ] = ( pat << 24 ) | ( chn << 16 ) | ( row << 8 ) | col;
+			if( shift )
+			{
+				col = 0;
+			}
+			else
+			{
+				row1 = row2;
+			}
+			gadItem[ gadnum ] = ( pat << 24 ) | ( chn << 16 ) | ( row1 << 10 ) | ( row2 << 4 ) | col;
 			gadRedraw[ gadnum ] = true;
 		}
 		
