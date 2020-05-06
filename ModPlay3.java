@@ -502,7 +502,8 @@ public class ModPlay3
 		if( instrument > 0 )
 		{
 			channelInstrument[ channel ] = instrument;
-			channelPeriod[ channel ] = keyToPeriod( key, sampleFineTune[ instrument ] );
+			int period = keyToPeriod( key, sampleFineTune[ instrument ] );
+			channelFrequency[ channel ] = period > 0 ? c2Rate * 428 / period : c2Rate;
 			channelSamplePos[ channel ] = 0;
 		}
 		channelVolume[ channel ] = volume;

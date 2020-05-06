@@ -26,7 +26,8 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 {
 	public static final String VERSION = "Tracker3 (c)2020 mumart@gmail.com";
 	
-	private static final long[] TOPAZ_8 = new long[] {
+	private static final long[] TOPAZ_8 = new long[]
+	{
 		0x0000000000000000L,
 		0x1818181818001800L,
 		0x3636000000000000L,
@@ -141,7 +142,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private static final int TEXT_YELLOW = 9;
 	private static final int TEXT_WHITE = 10;
 	private static final int TEXT_LIME = 11;
-
+	
 	private static final int[] FX_COLOURS = new int[]
 	{
 		/* 0 1 2 3 4 5 6 7 8 9 : ; < = > ? @ A B C D E F */
@@ -150,7 +151,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		TEXT_MAGENTA, 0, 0, 0, 0, 0, 0, 0, TEXT_YELLOW, TEXT_WHITE,
 		TEXT_YELLOW, TEXT_WHITE, 0, TEXT_WHITE
 	};
-
+	
 	private static final int[] EX_COLOURS = new int[]
 	{
 		/* 0 1 2 3 4 5 6 7 8 9 : ; < = > ? @ A B C D E F */
@@ -159,10 +160,23 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		0, 0, 0, 0, 0, 0, 0, TEXT_YELLOW, TEXT_YELLOW, TEXT_MAGENTA,
 		TEXT_MAGENTA, TEXT_MAGENTA, TEXT_MAGENTA
 	};
-
+	
+	private static final int[] KEY_MAP = new int[]
+	{
+		KeyEvent.VK_SPACE,
+		KeyEvent.VK_Z, KeyEvent.VK_S, KeyEvent.VK_X, KeyEvent.VK_D,
+		KeyEvent.VK_C, KeyEvent.VK_V, KeyEvent.VK_G, KeyEvent.VK_B,
+		KeyEvent.VK_H, KeyEvent.VK_N, KeyEvent.VK_J, KeyEvent.VK_M,
+		KeyEvent.VK_Q, KeyEvent.VK_2, KeyEvent.VK_W, KeyEvent.VK_3,
+		KeyEvent.VK_E, KeyEvent.VK_R, KeyEvent.VK_5, KeyEvent.VK_T,
+		KeyEvent.VK_6, KeyEvent.VK_Y, KeyEvent.VK_7, KeyEvent.VK_U,
+		KeyEvent.VK_I, KeyEvent.VK_9, KeyEvent.VK_O, KeyEvent.VK_0,
+		KeyEvent.VK_P
+	};
+	
 	private static final String KEY_TO_STR = "A-A#B-C-C#D-D#E-F-F#G-G#";
 	private static final String HEX_TO_STR = "0123456789ABCDEF";
-
+	
 	private static final int GAD_COUNT = 40;
 	private static final int GAD_TYPE_LABEL = 1;
 	private static final int GAD_TYPE_BUTTON = 2;
@@ -170,7 +184,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private static final int GAD_TYPE_SLIDER = 4;
 	private static final int GAD_TYPE_LISTBOX = 5;
 	private static final int GAD_TYPE_PATTERN = 6;
-
+	
 	private static final int KEY_ESCAPE = KeyEvent.VK_ESCAPE;
 	private static final int KEY_BACKSPACE = KeyEvent.VK_BACK_SPACE;
 	private static final int KEY_DELETE = KeyEvent.VK_DELETE;
@@ -217,7 +231,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	
 	private static final int MAX_CHANNELS = 8;
 	private static final int SAMPLING_RATE = 48000;
-
+	
 	private int width, height, clickX, clickY, focus;
 	
 	private int[] gadType = new int[ GAD_COUNT ];
@@ -238,7 +252,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private Image charset, image;
 	
 	private ModPlay3 modPlay3 = new ModPlay3( MAX_CHANNELS );
-	private int instrument, selectedFile;
+	private int instrument, octave = 2, selectedFile;
 	private boolean reverb;
 	
 	private static Color toColor( int rgb12 )
@@ -336,6 +350,18 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 	{
 		switch( e.getKeyCode() )
 		{
+			case KeyEvent.VK_F1:
+				octave = 1;
+				break;
+			case KeyEvent.VK_F2:
+				octave = 2;
+				break;
+			case KeyEvent.VK_F3:
+				octave = 3;
+				break;
+			case KeyEvent.VK_F4:
+				octave = 4;
+				break;
 			case KeyEvent.VK_F8:
 				setNumChannels( modPlay3.getNumChannels() < MAX_CHANNELS ? MAX_CHANNELS : 4 );
 				break;
@@ -359,6 +385,9 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 						break;
 					case GAD_TYPE_PATTERN:
 						keyPattern( focus, e.getKeyChar(), e.getKeyCode(), e.isShiftDown() );
+						break;
+					default:
+						trigger( 0, getNoteKey( e.getKeyCode() ) );
 						break;
 				}
 				break;
@@ -592,8 +621,8 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 	{
 		BufferedImage image = new BufferedImage( 24, 24, BufferedImage.TYPE_INT_RGB );
 		int[] pixels = new int[ 24 * 24 ];
-		drawChar( TOPAZ_8, 'T' - 32, 4, 5, 0, toRgb24( 0xF70 ), pixels, 24 );
-		drawChar( TOPAZ_8, '3' - 32, 12, 5, 0, toRgb24( 0x07F ), pixels, 24 );
+		drawChar( TOPAZ_8, 'T' - 32, 4, 5, 0, toRgb24( 0x07F ), pixels, 24 );
+		drawChar( TOPAZ_8, '3' - 32, 12, 5, 0, toRgb24( 0xF70 ), pixels, 24 );
 		image.setRGB( 0, 0, 24, 24, pixels, 0, 24 );
 		return image;
 	}
@@ -1222,6 +1251,33 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 		gadRedraw[ GADNUM_PATTERN ] = true;
 	}
 	
+	private static int getNoteKey( int key )
+	{
+		for( int idx = 0; idx < KEY_MAP.length; idx++ )
+		{
+			if( KEY_MAP[ idx ] == key )
+			{
+				return idx;
+			}
+		}
+		return 0;
+	}
+	
+	private void trigger( int channel, int noteKey )
+	{
+		if( !modPlay3.getSequencer() )
+		{
+			for( int chn = 0; chn < MAX_CHANNELS; chn++ )
+			{
+				modPlay3.trigger( chn, 0, 0, 0 );
+				if( chn == channel && noteKey > 0 )
+				{
+					modPlay3.trigger( chn, instrument, noteKey + octave * 12, modPlay3.getSampleVolume( instrument ) );
+				}
+			}
+		}
+	}
+	
 	private void keyPattern( int gadnum, char chr, int key, boolean shift )
 	{
 		int pat = ( gadItem[ gadnum ] >> 24 ) & 0xFF;
@@ -1289,6 +1345,9 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 						col = 3;
 					}
 					break;
+				default:
+					trigger( chn - 1, getNoteKey( key ) );
+					break;
 			}
 			if( shift )
 			{
@@ -1301,7 +1360,6 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 			gadItem[ gadnum ] = ( pat << 24 ) | ( chn << 16 ) | ( row1 << 10 ) | ( row2 << 4 ) | col;
 			gadRedraw[ gadnum ] = true;
 		}
-		
 	}
 	
 	private int findGadget( int x, int y )
