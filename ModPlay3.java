@@ -597,7 +597,7 @@ public class ModPlay3
 
 	private boolean row()
 	{
-		boolean songEnd = nextSequencePos <= currentSequencePos && nextRow <= currentRow && patternLoopCount <= 0;
+		boolean songEnd = nextSequencePos < currentSequencePos || ( nextSequencePos == currentSequencePos && nextRow <= currentRow && patternLoopCount <= 0 );
 		boolean patternBreak = false;
 		if( nextSequencePos < songLength )
 		{
@@ -606,6 +606,7 @@ public class ModPlay3
 		else
 		{
 			currentSequencePos = nextSequencePos = 0;
+			songEnd = true;
 		}
 		if( nextRow < 64 )
 		{
