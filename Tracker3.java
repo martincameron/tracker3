@@ -252,7 +252,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private Image charset, image;
 	
 	private ModPlay3 modPlay3 = new ModPlay3( MAX_CHANNELS );
-	private int instrument, octave = 2, selectedFile;
+	private int instrument, octave = 2, selectedFile, triggerChannel;
 	private boolean reverb;
 	
 	private static Color toColor( int rgb12 )
@@ -382,12 +382,13 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 						break;
 					case GAD_TYPE_LISTBOX:
 						keyListbox( focus, e.getKeyChar(), e.getKeyCode() );
+						trigger( -1, getNoteKey( e.getKeyCode() ) );
 						break;
 					case GAD_TYPE_PATTERN:
 						keyPattern( focus, e.getKeyChar(), e.getKeyCode(), e.isShiftDown() );
 						break;
 					default:
-						trigger( 0, getNoteKey( e.getKeyCode() ) );
+						trigger( -1, getNoteKey( e.getKeyCode() ) );
 						break;
 				}
 				break;
@@ -1267,13 +1268,20 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 	{
 		if( !modPlay3.getSequencer() )
 		{
-			for( int chn = 0; chn < MAX_CHANNELS; chn++ )
+			if( noteKey > 0 )
 			{
-				modPlay3.trigger( chn, 0, 0, 0 );
-				if( chn == channel && noteKey > 0 )
+				int key = noteKey + octave * 12;
+				int vol = modPlay3.getSampleVolume( instrument );
+				if( channel < 0 )
 				{
-					modPlay3.trigger( chn, instrument, noteKey + octave * 12, modPlay3.getSampleVolume( instrument ) );
+					channel = triggerChannel;
+					triggerChannel = ( triggerChannel + 1 ) % modPlay3.getNumChannels();
 				}
+				modPlay3.trigger( channel, instrument, key, vol );
+			}
+			else
+			{
+				stop();
 			}
 		}
 	}
