@@ -174,6 +174,14 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		KeyEvent.VK_P
 	};
 	
+	private static final int[] HEX_MAP = new int[]
+	{
+		KeyEvent.VK_0, KeyEvent.VK_1, KeyEvent.VK_2, KeyEvent.VK_3,
+		KeyEvent.VK_4, KeyEvent.VK_5, KeyEvent.VK_6, KeyEvent.VK_7,
+		KeyEvent.VK_8, KeyEvent.VK_9, KeyEvent.VK_A, KeyEvent.VK_B,
+		KeyEvent.VK_C, KeyEvent.VK_D, KeyEvent.VK_E, KeyEvent.VK_F
+	};
+	
 	private static final String KEY_TO_STR = "A-A#B-C-C#D-D#E-F-F#G-G#";
 	private static final String HEX_TO_STR = "0123456789ABCDEF";
 	
@@ -338,12 +346,8 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 
 		gadRedraw[ 0 ] = true;
 
-byte[] patternData = new byte[ MAX_CHANNELS * 4 * 64 * 128 ];
-patternData[ 0 ] = 0x01;
-patternData[ 1 ] = 0x1F;
-patternData[ 2 ] = 0x0C;
-patternData[ 3 ] = 0x40;
-modPlay3.setPatternData( patternData, MAX_CHANNELS );
+		modPlay3.setPatternData( new byte[ MAX_CHANNELS * 4 * 64 * 128 ], MAX_CHANNELS );
+setNote( 0, 0, 0, 0x011F0C40 );
 	}
 	
 	public synchronized void keyPressed( KeyEvent e )
@@ -1093,10 +1097,31 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 		gadValue[ listbox ] = gadValue[ slider ];
 	}
 	
-	private String getNote( int pat, int row, int chn )
+	private int getNote( int pat, int row, int chn )
 	{
-		int offset = ( ( pat * 64 + row ) * MAX_CHANNELS + chn ) * 4;
 		byte[] patternData = modPlay3.getPatternData();
+		int offset = ( ( pat * 64 + row ) * MAX_CHANNELS + chn ) * 4;
+		int key = patternData[ offset ] & 0xFF;
+		int instrument = patternData[ offset + 1 ] & 0xFF;
+		int effect = patternData[ offset + 2 ] & 0xFF;
+		int param = patternData[ offset + 3 ] & 0xFF;
+		return ( key << 24 ) | ( instrument << 16 ) | ( effect << 8 ) | param;
+	}
+	
+	private void setNote( int pat, int row, int chn, int note )
+	{
+		byte[] patternData = modPlay3.getPatternData();
+		int offset = ( ( pat * 64 + row ) * MAX_CHANNELS + chn ) * 4;
+		patternData[ offset ] = ( byte ) ( note >> 24 );
+		patternData[ offset + 1 ] = ( byte ) ( note >> 16 );
+		patternData[ offset + 2 ] = ( byte ) ( note >> 8 );
+		patternData[ offset + 3 ] = ( byte ) note;
+	}
+	
+	private String getNoteString( int pat, int row, int chn )
+	{
+		byte[] patternData = modPlay3.getPatternData();
+		int offset = ( ( pat * 64 + row ) * MAX_CHANNELS + chn ) * 4;
 		int key = patternData[ offset ] & 0xFF;
 		int instrument = patternData[ offset + 1 ] & 0xFF;
 		int effect = patternData[ offset + 2 ] & 0xFF;
@@ -1158,7 +1183,7 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 				drawInt( g, x + 8, y + r * 16, dr, 2, TEXT_BLUE + hl );
 				for( int c = 0; c < numChannels; c++ )
 				{
-					String note = getNote( pat, dr, c );
+					String note = getNoteString( pat, dr, c );
 					if( ( ( mute >> c ) & 1 ) > 0 )
 					{
 						drawText( g, x + ( c * 9 + 4 ) * 8, y + r * 16, note, TEXT_BLUE );
@@ -1264,6 +1289,18 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 		return 0;
 	}
 	
+	private static int getHexKey( int key )
+	{
+		for( int idx = 0; idx < HEX_MAP.length; idx++ )
+		{
+			if( HEX_MAP[ idx ] == key )
+			{
+				return idx;
+			}
+		}
+		return -1;
+	}
+	
 	private void trigger( int channel, int noteKey )
 	{
 		if( !modPlay3.getSequencer() )
@@ -1354,7 +1391,20 @@ modPlay3.setPatternData( patternData, MAX_CHANNELS );
 					}
 					break;
 				default:
-					trigger( chn - 1, getNoteKey( key ) );
+					if( col > 4 )
+					{
+						int hex = getHexKey( key );
+						if( hex >= 0 && row1 == row2 )
+						{
+							int note = getNote( pat, row2, chn - 1 ) & ~( 0xF << ( 7 - col ) * 4 );
+							setNote( pat, row2, chn - 1, note | ( hex << ( 7 - col ) * 4 ) );
+							col = col < 7 ? col + 1 : 6;
+						}
+					}
+					else
+					{
+						trigger( chn - 1, getNoteKey( key ) );
+					}
 					break;
 			}
 			if( shift )
