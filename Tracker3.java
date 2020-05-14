@@ -347,7 +347,10 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		gadRedraw[ 0 ] = true;
 
 		modPlay3.setPatternData( new byte[ MAX_CHANNELS * 4 * 64 * 128 ], MAX_CHANNELS );
-setNote( 0, 0, 0, 0x011F0C40 );
+setNoteKey( 0, 0, 0, 0x01 );
+setNoteInstrument( 0, 0, 0, 0x1F );
+setNoteEffect( 0, 0, 0, 0x0C );
+setNoteParam( 0, 0, 0, 0x40 );
 	}
 	
 	public synchronized void keyPressed( KeyEvent e )
@@ -386,13 +389,13 @@ setNote( 0, 0, 0, 0x011F0C40 );
 						break;
 					case GAD_TYPE_LISTBOX:
 						keyListbox( focus, e.getKeyChar(), e.getKeyCode() );
-						trigger( -1, getNoteKey( e.getKeyCode() ) );
+						trigger( -1, mapEventKey( KEY_MAP, e.getKeyCode() ) );
 						break;
 					case GAD_TYPE_PATTERN:
 						keyPattern( focus, e.getKeyChar(), e.getKeyCode(), e.isShiftDown() );
 						break;
 					default:
-						trigger( -1, getNoteKey( e.getKeyCode() ) );
+						trigger( -1, mapEventKey( KEY_MAP, e.getKeyCode() ) );
 						break;
 				}
 				break;
@@ -1097,31 +1100,55 @@ setNote( 0, 0, 0, 0x011F0C40 );
 		gadValue[ listbox ] = gadValue[ slider ];
 	}
 	
-	private int getNote( int pat, int row, int chn )
+	private int getNoteOffset( int pat, int row, int chn )
 	{
-		byte[] patternData = modPlay3.getPatternData();
-		int offset = ( ( pat * 64 + row ) * MAX_CHANNELS + chn ) * 4;
-		int key = patternData[ offset ] & 0xFF;
-		int instrument = patternData[ offset + 1 ] & 0xFF;
-		int effect = patternData[ offset + 2 ] & 0xFF;
-		int param = patternData[ offset + 3 ] & 0xFF;
-		return ( key << 24 ) | ( instrument << 16 ) | ( effect << 8 ) | param;
+		return ( ( pat * 64 + row ) * MAX_CHANNELS + chn ) * 4;
 	}
 	
-	private void setNote( int pat, int row, int chn, int note )
+	private int getNoteKey( int pat, int row, int chn )
 	{
-		byte[] patternData = modPlay3.getPatternData();
-		int offset = ( ( pat * 64 + row ) * MAX_CHANNELS + chn ) * 4;
-		patternData[ offset ] = ( byte ) ( note >> 24 );
-		patternData[ offset + 1 ] = ( byte ) ( note >> 16 );
-		patternData[ offset + 2 ] = ( byte ) ( note >> 8 );
-		patternData[ offset + 3 ] = ( byte ) note;
+		return modPlay3.getPatternData()[ getNoteOffset( pat, row, chn ) ] & 0xFF;
+	}
+	
+	private void setNoteKey( int pat, int row, int chn, int key )
+	{
+		modPlay3.getPatternData()[ getNoteOffset( pat, row, chn ) ] = ( byte ) key;
+	}
+	
+	private int getNoteInstrument( int pat, int row, int chn )
+	{
+		return modPlay3.getPatternData()[ getNoteOffset( pat, row, chn ) + 1 ] & 0x1F;
+	}
+	
+	private void setNoteInstrument( int pat, int row, int chn, int instrument )
+	{
+		modPlay3.getPatternData()[ getNoteOffset( pat, row, chn ) + 1 ] = ( byte ) ( instrument & 0x1F );
+	}
+	
+	private int getNoteEffect( int pat, int row, int chn )
+	{
+		return modPlay3.getPatternData()[ getNoteOffset( pat, row, chn ) + 2 ] & 0xF;
+	}
+	
+	private void setNoteEffect( int pat, int row, int chn, int effect )
+	{
+		modPlay3.getPatternData()[ getNoteOffset( pat, row, chn ) + 2 ] = ( byte ) ( effect & 0xF );
+	}
+	
+	private int getNoteParam( int pat, int row, int chn )
+	{
+		return modPlay3.getPatternData()[ getNoteOffset( pat, row, chn ) + 3 ] & 0xFF;
+	}
+	
+	private void setNoteParam( int pat, int row, int chn, int param )
+	{
+		modPlay3.getPatternData()[ getNoteOffset( pat, row, chn ) + 3 ] = ( byte ) param;
 	}
 	
 	private String getNoteString( int pat, int row, int chn )
 	{
 		byte[] patternData = modPlay3.getPatternData();
-		int offset = ( ( pat * 64 + row ) * MAX_CHANNELS + chn ) * 4;
+		int offset = getNoteOffset( pat, row, chn );
 		int key = patternData[ offset ] & 0xFF;
 		int instrument = patternData[ offset + 1 ] & 0xFF;
 		int effect = patternData[ offset + 2 ] & 0xFF;
@@ -1277,23 +1304,11 @@ setNote( 0, 0, 0, 0x011F0C40 );
 		gadRedraw[ GADNUM_PATTERN ] = true;
 	}
 	
-	private static int getNoteKey( int key )
+	private static int mapEventKey( int[] keyMap, int eventKey )
 	{
-		for( int idx = 0; idx < KEY_MAP.length; idx++ )
+		for( int idx = 0; idx < keyMap.length; idx++ )
 		{
-			if( KEY_MAP[ idx ] == key )
-			{
-				return idx;
-			}
-		}
-		return 0;
-	}
-	
-	private static int getHexKey( int key )
-	{
-		for( int idx = 0; idx < HEX_MAP.length; idx++ )
-		{
-			if( HEX_MAP[ idx ] == key )
+			if( keyMap[ idx ] == eventKey )
 			{
 				return idx;
 			}
@@ -1390,20 +1405,65 @@ setNote( 0, 0, 0, 0x011F0C40 );
 						col = 3;
 					}
 					break;
-				default:
-					if( col > 4 )
+				case KEY_DELETE:
+					int row = row2 > row1 ? row1 : row2;
+					while( row <= row1 || row <= row2 )
 					{
-						int hex = getHexKey( key );
-						if( hex >= 0 && row1 == row2 )
+						if( col < 3 )
 						{
-							int note = getNote( pat, row2, chn - 1 ) & ~( 0xF << ( 7 - col ) * 4 );
-							setNote( pat, row2, chn - 1, note | ( hex << ( 7 - col ) * 4 ) );
-							col = col < 7 ? col + 1 : 6;
+							setNoteKey( pat, row, chn - 1, 0 );
 						}
+						if( col < 5 )
+						{
+							setNoteInstrument( pat, row, chn - 1, 0 );
+						}
+						setNoteEffect( pat, row, chn - 1, 0 );
+						setNoteParam( pat, row, chn - 1, 0 );
+						row++;
 					}
-					else
+					break;
+				default:
+					if( row1 == row2 )
 					{
-						trigger( chn - 1, getNoteKey( key ) );
+						if( col > 2 )
+						{
+							int hex = mapEventKey( HEX_MAP, key );
+							if( col == 3 && hex >= 0 && hex < 4 )
+							{
+								setNoteInstrument( pat, row2, chn - 1, hex * 10 );
+								col++;
+							}
+							else if( col == 4 && hex >= 0 && hex < 10 )
+							{
+								setNoteInstrument( pat, row2, chn - 1, getNoteInstrument( pat, row2, chn - 1 ) / 10 * 10 + hex );
+								col++;
+							}
+							else if( col == 5 && hex >= 0 )
+							{
+								setNoteEffect( pat, row2, chn - 1, hex );
+								col++;
+							}
+							else if( col == 6 && hex >= 0 )
+							{
+								setNoteParam( pat, row2, chn - 1, hex << 4 );
+								col++;
+							}
+							else if( col == 7 && hex >= 0 )
+							{
+								setNoteParam( pat, row2, chn - 1, ( getNoteParam( pat, row2, chn - 1 ) & 0xF0 ) | hex );
+								col--;
+							}
+						}
+						else
+						{
+							int noteKey = mapEventKey( KEY_MAP, key );
+							if( noteKey > 0 )
+							{
+								setNoteKey( pat, row2, chn - 1, noteKey + octave * 12 );
+								setNoteInstrument( pat, row2, chn - 1, instrument );
+							}
+							trigger( chn - 1, noteKey );
+						}
 					}
 					break;
 			}
