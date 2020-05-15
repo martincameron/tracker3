@@ -2008,7 +2008,108 @@ setNoteParam( 0, 0, 0, 0x40 );
 	
 	private void load( File file ) throws IOException
 	{
-		System.out.println( "Load " + file.getAbsolutePath() );
+		String extension = file.getName().toLowerCase();
+		if( extension.length() > 3 )
+		{
+			extension = extension.substring( extension.length() - 4 );
+		}
+		if( extension.equals( ".wav" ) )
+		{
+			loadWav( file );
+		}
+		else if( extension.equals( ".iff" ) )
+		{
+			loadIff( file );
+		}
+		else if( extension.equals( ".raw" ) )
+		{
+			loadRaw( file );
+		}
+		else
+		{
+			loadMod( file );
+		}
+	}
+	
+	private void loadWav( File file )
+	{
+		System.out.println( "LoadWav " + file.getAbsolutePath() );
+	}
+	
+	private void loadIff( File file ) throws IOException
+	{
+		System.out.println( "LoadIff " + file.getAbsolutePath() );
+		FileInputStream inputStream = new FileInputStream( file );
+		try
+		{
+			String chunkId = ModPlay3.readString( inputStream, 4 );
+			if( !"FORM".equals( chunkId ) )
+			{
+				throw new IllegalArgumentException( "FORM chunk not found." );
+			}
+			int chunkSize = ModPlay3.readIntBe( inputStream, 4 );
+			chunkId = ModPlay3.readString( inputStream, 4 );
+			if( !"8SVX".equals( chunkId ) )
+			{
+				throw new IllegalArgumentException( "8SVX chunk not found." );
+			}
+			chunkId = ModPlay3.readString( inputStream, 4 );
+			if( !"VHDR".equals( chunkId ) )
+			{
+				throw new IllegalArgumentException( "VHDR chunk not found." );
+			}
+			chunkSize = ModPlay3.readIntBe( inputStream, 4 );
+			int attackLen = ModPlay3.readIntBe( inputStream, 4 );
+			int sustainLen = ModPlay3.readIntBe( inputStream, 4 );
+			int samplesHigh = ModPlay3.readIntBe( inputStream, 4 );
+			int sampleRate = ModPlay3.readIntBe( inputStream, 2 );
+			int numOctaves = inputStream.read();
+			int compression = inputStream.read();
+			if( compression != 0 )
+			{
+				throw new IllegalArgumentException( "Compressed IFF not supported." );
+			}
+			int volume = ModPlay3.readIntBe( inputStream, 4 );
+			chunkId = ModPlay3.readString( inputStream, 4 );
+			while( !"BODY".equals( chunkId ) )
+			{
+				chunkSize = ModPlay3.readIntBe( inputStream, 4 );
+				inputStream.skip( chunkSize );
+				chunkId = ModPlay3.readString( inputStream, 4 );
+			}
+			int numSamples = ModPlay3.readIntBe( inputStream, 4 );
+			setSampleData( file.getName(), ModPlay3.readBytes( inputStream, numSamples ) );
+		}
+		finally
+		{
+			inputStream.close();
+		}
+	}
+	
+	private void loadRaw( File file ) throws IOException
+	{
+		System.out.println( "LoadRaw " + file.getAbsolutePath() );
+		FileInputStream inputStream = new FileInputStream( file );
+		try
+		{
+			setSampleData( file.getName(), ModPlay3.readBytes( inputStream, ( int ) file.length() ) );
+		}
+		finally
+		{
+			inputStream.close();
+		}
+	}
+	
+	private void setSampleData( String instrumentName, byte[] sampleData )
+	{
+		modPlay3.setInstrumentName( instrument, instrumentName );
+		modPlay3.setSampleData( instrument, sampleData );
+		setInstrument( instrument );
+	}
+	
+	private void loadMod( File file ) throws IOException
+	{
+		System.out.println( "LoadMod " + file.getAbsolutePath() );
 		FileInputStream inputStream = new FileInputStream( file );
 		try
 		{

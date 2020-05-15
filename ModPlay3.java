@@ -1037,20 +1037,33 @@ public class ModPlay3
 		return ( period >> 1 ) + ( period & 1 );
 	}
 	
-	private static byte[] readBytes( java.io.InputStream inputStream, int length ) throws java.io.IOException
+	private static void clear( int[] array )
 	{
-		byte[] bytes = new byte[ length ];
-		int offset = 0;
-		int count = 0;
-		while( offset < length && count >= 0 )
+		for( int idx = 0; idx < array.length; idx++ )
 		{
-			offset += count;
-			count = inputStream.read( bytes, offset, length - offset );
+			array[ idx ] = 0;
 		}
-		return bytes;
 	}
 	
-	private static String readString( java.io.InputStream inputStream, int length ) throws java.io.IOException
+	private static void writeAscii( String text, byte[] outBuf, int offset, int len )
+	{
+		for( int idx = 0; idx < len; idx++ )
+		{
+			outBuf[ offset + idx ] = ( byte ) ( idx < text.length() ? text.charAt( idx ) : 32 );
+		}
+	}
+	
+	public static int readIntBe( java.io.InputStream inputStream, int length ) throws java.io.IOException
+	{
+		int value = 0;
+		for( int idx = 0; idx < length; idx++ )
+		{
+			value = ( value << 8 ) | inputStream.read();
+		}
+		return value;
+	}
+	
+	public static String readString( java.io.InputStream inputStream, int length ) throws java.io.IOException
 	{
 		byte[] bytes = readBytes( inputStream, length );
 		length = 0;
@@ -1068,20 +1081,17 @@ public class ModPlay3
 		return new String( bytes, 0, length, "ISO-8859-1" );
 	}
 	
-	private static void writeAscii( String text, byte[] outBuf, int offset, int len )
+	public static byte[] readBytes( java.io.InputStream inputStream, int length ) throws java.io.IOException
 	{
-		for( int idx = 0; idx < len; idx++ )
+		byte[] bytes = new byte[ length ];
+		int offset = 0;
+		int count = 0;
+		while( offset < length && count >= 0 )
 		{
-			outBuf[ offset + idx ] = ( byte ) ( idx < text.length() ? text.charAt( idx ) : 32 );
+			offset += count;
+			count = inputStream.read( bytes, offset, length - offset );
 		}
-	}
-	
-	private static void clear( int[] array )
-	{
-		for( int idx = 0; idx < array.length; idx++ )
-		{
-			array[ idx ] = 0;
-		}
+		return bytes;
 	}
 	
 	public static String pad( String string, char chr, int length, boolean left )
