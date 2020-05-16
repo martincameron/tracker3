@@ -613,6 +613,26 @@ setNoteParam( 0, 0, 0, 0x40 );
 		return new Dimension( width, height );
 	}
 	
+	private static int readIntBe( java.io.InputStream inputStream, int length ) throws IOException
+	{
+		int value = 0;
+		for( int idx = 0; idx < length; idx++ )
+		{
+			value = ( value << 8 ) | inputStream.read();
+		}
+		return value;
+	}
+	
+	private static int readIntLe( java.io.InputStream inputStream, int length ) throws IOException
+	{
+		int value = 0;
+		for( int idx = 0; idx < length; idx++ )
+		{
+			value = value | ( inputStream.read() << idx * 8 );
+		}
+		return value;
+	}
+	
 	private static void drawChar( long[] source, int chr, int x, int y, int bg, int fg, int[] dest, int stride )
 	{
 		int destIdx = y * stride + x;
@@ -2015,7 +2035,7 @@ setNoteParam( 0, 0, 0, 0x40 );
 		}
 		if( extension.equals( ".wav" ) )
 		{
-			loadWav( file );
+			loadWav( file, 0 );
 		}
 		else if( extension.equals( ".iff" ) )
 		{
@@ -2031,9 +2051,104 @@ setNoteParam( 0, 0, 0, 0x40 );
 		}
 	}
 	
-	private void loadWav( File file )
+	private void loadWav( File file, int channel ) throws IOException
 	{
 		System.out.println( "LoadWav " + file.getAbsolutePath() );
+		FileInputStream inputStream = new FileInputStream( file );
+		try
+		{
+			String chunkId = ModPlay3.readString( inputStream, 4 );
+			if( !"RIFF".equals( chunkId ) )
+			{
+				throw new IllegalArgumentException( "Riff header not found." );
+			}
+			int chunkSize = readIntLe( inputStream, 4 );
+			chunkId = ModPlay3.readString( inputStream, 4 );
+			if( !"WAVE".equals( chunkId ) )
+			{
+				throw new IllegalArgumentException( "Wave header not found." );
+			}
+			chunkId = ModPlay3.readString( inputStream, 3 );
+			if( !"fmt".equals( chunkId ) )
+			{
+				throw new IllegalArgumentException( "Format header not found." );
+			}
+			inputStream.skip( 1 );
+			chunkSize = readIntLe( inputStream, 4 );
+			int format = readIntLe( inputStream, 2 );
+			int numChannels = readIntLe( inputStream, 2 );
+			if( channel < 0 || channel >= numChannels )
+			{
+				throw new IllegalArgumentException( "No such channel: " + channel );
+			}
+			int sampleRate = readIntLe( inputStream, 4 );
+			int bytesPerSec = readIntLe( inputStream, 4 );
+			int bytesPerSample = readIntLe( inputStream, 2 );
+			int bytesPerChannel = bytesPerSample / numChannels;
+			int bitsPerSample = readIntLe( inputStream, 2 );
+			if( format == 0xFFFE )
+			{
+				int blockSize = readIntLe( inputStream, 2 );
+				int validBits = readIntLe( inputStream, 2 );
+				int channelMask = readIntLe( inputStream, 4 );
+				String formatId = ModPlay3.readString( inputStream, 16 );
+				if( formatId.equals( "\u0001\u0000\u0000\u0000\u0000\u0000\u0010\u0000\u0080\u0000\u0000\u00AA\u0000\u0038\u009B\u0071" ) )
+				{
+					format = 1;
+				}
+				inputStream.skip( chunkSize - 40 );
+			}
+			else
+			{
+				inputStream.skip( chunkSize - 16 );
+			}
+			if( format != 1 || bitsPerSample > 24 )
+			{
+				throw new IllegalArgumentException( "Unsupported sample format." );
+			}
+			chunkId = ModPlay3.readString( inputStream, 4 );
+			while( !"data".equals( chunkId ) )
+			{
+				//System.err.println( "Ignoring chunk: " + new String( chunkId ) );
+				chunkSize = readIntLe( inputStream, 4 );
+				inputStream.skip( chunkSize );
+				chunkId = ModPlay3.readString( inputStream, 4 );
+			}
+			int numSamples = readIntLe( inputStream, 4 ) / bytesPerSample;
+			byte[] sampleData = new byte[ numSamples ];
+			byte[] inputBuf = ModPlay3.readBytes( inputStream, numSamples * bytesPerSample );
+			int inputIdx = channel * bytesPerChannel;
+			int outputIdx = 0;
+			switch( bytesPerChannel )
+			{
+				case 1: // 8-bit unsigned.
+					while( outputIdx < numSamples )
+					{
+						sampleData[ outputIdx++ ] = ( byte ) ( ( inputBuf[ inputIdx ] & 0xFF ) - 128 );
+						inputIdx += bytesPerSample;
+					}
+					break;
+				case 2: // 16-bit signed little-endian.
+					while( outputIdx < numSamples )
+					{
+						sampleData[ outputIdx++ ] = ( byte ) inputBuf[ inputIdx + 1 ];
+						inputIdx += bytesPerSample;
+					}
+					break;
+				case 3: // 24-bit signed little-endian.
+					while( outputIdx < numSamples )
+					{
+						sampleData[ outputIdx++ ] = ( byte ) inputBuf[ inputIdx + 2 ];
+						inputIdx += bytesPerSample;
+					}
+					break;
+			}
+			setSampleData( file.getName(), sampleData );
+		}
+		finally
+		{
+			inputStream.close();
+		}
 	}
 	
 	private void loadIff( File file ) throws IOException
@@ -2047,7 +2162,7 @@ setNoteParam( 0, 0, 0, 0x40 );
 			{
 				throw new IllegalArgumentException( "FORM chunk not found." );
 			}
-			int chunkSize = ModPlay3.readIntBe( inputStream, 4 );
+			int chunkSize = readIntBe( inputStream, 4 );
 			chunkId = ModPlay3.readString( inputStream, 4 );
 			if( !"8SVX".equals( chunkId ) )
 			{
@@ -2058,26 +2173,26 @@ setNoteParam( 0, 0, 0, 0x40 );
 			{
 				throw new IllegalArgumentException( "VHDR chunk not found." );
 			}
-			chunkSize = ModPlay3.readIntBe( inputStream, 4 );
-			int attackLen = ModPlay3.readIntBe( inputStream, 4 );
-			int sustainLen = ModPlay3.readIntBe( inputStream, 4 );
-			int samplesHigh = ModPlay3.readIntBe( inputStream, 4 );
-			int sampleRate = ModPlay3.readIntBe( inputStream, 2 );
+			chunkSize = readIntBe( inputStream, 4 );
+			int attackLen = readIntBe( inputStream, 4 );
+			int sustainLen = readIntBe( inputStream, 4 );
+			int samplesHigh = readIntBe( inputStream, 4 );
+			int sampleRate = readIntBe( inputStream, 2 );
 			int numOctaves = inputStream.read();
 			int compression = inputStream.read();
 			if( compression != 0 )
 			{
 				throw new IllegalArgumentException( "Compressed IFF not supported." );
 			}
-			int volume = ModPlay3.readIntBe( inputStream, 4 );
+			int volume = readIntBe( inputStream, 4 );
 			chunkId = ModPlay3.readString( inputStream, 4 );
 			while( !"BODY".equals( chunkId ) )
 			{
-				chunkSize = ModPlay3.readIntBe( inputStream, 4 );
+				chunkSize = readIntBe( inputStream, 4 );
 				inputStream.skip( chunkSize );
 				chunkId = ModPlay3.readString( inputStream, 4 );
 			}
-			int numSamples = ModPlay3.readIntBe( inputStream, 4 );
+			int numSamples = readIntBe( inputStream, 4 );
 			setSampleData( file.getName(), ModPlay3.readBytes( inputStream, numSamples ) );
 		}
 		finally
@@ -2158,11 +2273,6 @@ setNoteParam( 0, 0, 0, 0x40 );
 		}
 	}
 	
-	private boolean getReverb()
-	{
-		return reverb;
-	}
-	
 	private synchronized int getAudio( int sampleRate, int[] output )
 	{
 		int count = modPlay3.getAudio( sampleRate, output );
@@ -2232,7 +2342,7 @@ setNoteParam( 0, 0, 0, 0x40 );
 					offset += count;
 				}
 				ModPlay3.downsample( downsampleBuf, DOWNSAMPLE_BUF_SAMPLES / 2, FILTER_COEFFS );
-				if( tracker3.getReverb() )
+				if( tracker3.reverb )
 				{
 					reverbIdx = ModPlay3.reverb( downsampleBuf, reverbBuf, reverbIdx, DOWNSAMPLE_BUF_SAMPLES / 2 );
 				}

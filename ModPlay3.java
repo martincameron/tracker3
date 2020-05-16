@@ -1053,16 +1053,6 @@ public class ModPlay3
 		}
 	}
 	
-	public static int readIntBe( java.io.InputStream inputStream, int length ) throws java.io.IOException
-	{
-		int value = 0;
-		for( int idx = 0; idx < length; idx++ )
-		{
-			value = ( value << 8 ) | inputStream.read();
-		}
-		return value;
-	}
-	
 	public static String readString( java.io.InputStream inputStream, int length ) throws java.io.IOException
 	{
 		byte[] bytes = readBytes( inputStream, length );
