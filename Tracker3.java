@@ -1296,30 +1296,32 @@ setNoteParam( 0, 0, 0, 0x40 );
 		int row = ( clickY - gadY[ gadnum ] ) / 16;
 		int col = ( clickX - gadX[ gadnum ] ) / 8;
 		int chn = ( col - 4 ) / 9;
-		if( row < 1 || modPlay3.getSequencer() )
+		int selRow = gadValue[ gadnum ] + row - 8;
+		if( row > 0 && col > 3 && selRow >= 0 && selRow < 64 && chn < modPlay3.getNumChannels() && !modPlay3.getSequencer() )
+		{
+			int pat = modPlay3.getPattern( modPlay3.getSequencePos() );
+			gadItem[ gadnum ] = ( pat << 24 ) | ( ( chn + 1 ) << 16 ) | ( selRow << 10 ) | ( selRow << 4 ) | ( col - chn * 9 - 4 );
+		}
+		else
 		{
 			int mask = 1 << chn;
 			int mute = modPlay3.getMute();
-			if( mute == ~mask || col < 4 ) {
+			if( mute == ~mask || col < 4 || chn >= modPlay3.getNumChannels() )
+			{
 				/* Solo channel, unmute all. */
 				mute = 0;
-			} else if( ( mute & mask ) > 0 ) {
+			}
+			else if( ( mute & mask ) > 0 )
+			{
 				/* Muted channel, unmute. */
 				mute ^= mask;
-			} else {
+			}
+			else
+			{
 				/* Unmuted channel, set as solo. */
 				mute = -1 ^ mask;
 			}
 			modPlay3.setMute( mute );
-		}
-		else
-		{
-			row = gadValue[ gadnum ] + row - 8;
-			if( col > 3 && row >= 0 && row < 64 && chn < modPlay3.getNumChannels() )
-			{
-				int pat = modPlay3.getPattern( modPlay3.getSequencePos() );
-				gadItem[ gadnum ] = ( pat << 24 ) | ( ( chn + 1 ) << 16 ) | ( row << 10 ) | ( row << 4 ) | ( col - chn * 9 - 4 );
-			}
 		}
 		gadRedraw[ GADNUM_PATTERN ] = true;
 	}
@@ -1346,8 +1348,15 @@ setNoteParam( 0, 0, 0, 0x40 );
 				int vol = modPlay3.getSampleVolume( instrument );
 				if( channel < 0 )
 				{
+					for( int chn = 0; chn < modPlay3.getNumChannels(); chn++ )
+					{
+						triggerChannel = ( triggerChannel + 1 ) % modPlay3.getNumChannels();
+						if( ( ( modPlay3.getMute() >> triggerChannel ) & 1 ) == 0 )
+						{
+							break;
+						}
+					}
 					channel = triggerChannel;
-					triggerChannel = ( triggerChannel + 1 ) % modPlay3.getNumChannels();
 				}
 				modPlay3.trigger( channel, instrument, key, vol );
 			}
@@ -1497,6 +1506,10 @@ setNoteParam( 0, 0, 0, 0x40 );
 			}
 			gadItem[ gadnum ] = ( pat << 24 ) | ( chn << 16 ) | ( row1 << 10 ) | ( row2 << 4 ) | col;
 			gadRedraw[ gadnum ] = true;
+		}
+		else
+		{
+			trigger( -1, mapEventKey( KEY_MAP, key ) );
 		}
 	}
 	
@@ -1951,6 +1964,7 @@ setNoteParam( 0, 0, 0, 0x40 );
 	
 	private void setNumChannels( int numChannels )
 	{
+		modPlay3.setMute( 0 );
 		modPlay3.setNumChannels( numChannels );
 		for( int chn = numChannels; chn < MAX_CHANNELS; chn++ )
 		{
@@ -2091,10 +2105,13 @@ setNoteParam( 0, 0, 0, 0x40 );
 				int blockSize = readIntLe( inputStream, 2 );
 				int validBits = readIntLe( inputStream, 2 );
 				int channelMask = readIntLe( inputStream, 4 );
-				String formatId = ModPlay3.readString( inputStream, 16 );
-				if( formatId.equals( "\u0001\u0000\u0000\u0000\u0000\u0000\u0010\u0000\u0080\u0000\u0000\u00AA\u0000\u0038\u009B\u0071" ) )
+				format = 1;
+				for( int idx = 0; idx < 16; idx++ )
 				{
-					format = 1;
+					if( inputStream.read() != "\1\0\0\0\0\0\20\0\200\0\0\252\0\70\233\161".charAt( idx ) )
+					{
+						format = 0;
+					}
 				}
 				inputStream.skip( chunkSize - 40 );
 			}
