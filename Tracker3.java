@@ -686,8 +686,17 @@ setNoteParam( 0, 0, 0, 0x40 );
 	{
 		for( int idx = 0, len = text.length(); idx < len; idx++ )
 		{
+			int chr = text.charAt( idx );
+			if( chr < 32 || ( chr > 126 && chr < 192 ) || chr > 255 )
+			{
+				chr = 32;
+			}
+			else if( chr >= 192 )
+			{
+				chr = "AAAAAAECEEEEIIIIDNOOOOO*0UUUUYPSaaaaaaeceeeeiiiidnooooo/0uuuuypy".charAt( chr - 192 );
+			}
 			g.setClip( x, y, 8, 16 );
-			g.drawImage( charset, x - ( text.charAt( idx ) - 32 ) * 8, y - colour * 16, null );
+			g.drawImage( charset, x - ( chr - 32 ) * 8, y - colour * 16, null );
 			x += 8;
 		}
 		g.setClip( null );
