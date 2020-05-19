@@ -369,11 +369,17 @@ setNoteParam( 0, 0, 0, 0x40 );
 			case KeyEvent.VK_F4:
 				octave = 4;
 				break;
+			case KeyEvent.VK_F5:
+				reverb = !reverb;
+				break;
 			case KeyEvent.VK_F8:
 				setNumChannels( modPlay3.getNumChannels() < MAX_CHANNELS ? MAX_CHANNELS : 4 );
 				break;
 			case KeyEvent.VK_F9:
-				reverb = !reverb;
+				if( e.isShiftDown() )
+				{
+					cropInstrument();
+				}
 				break;
 			case KeyEvent.VK_F10:
 				if( e.isShiftDown() )
@@ -1980,6 +1986,20 @@ setNoteParam( 0, 0, 0, 0x40 );
 			modPlay3.trigger( chn, 0, 0, 0 );
 		}
 		gadRedraw[ GADNUM_PATTERN ] = true;
+	}
+	
+	private void cropInstrument()
+	{
+		int loopStart = modPlay3.getSampleLoopStart( instrument );
+		int loopLength = modPlay3.getSampleLoopLength( instrument );
+		if( loopLength > 0 )
+		{
+			byte[] sampleData = new byte[ loopLength ];
+			System.arraycopy( modPlay3.getSampleData( instrument ), loopStart, sampleData, 0, loopLength );
+			modPlay3.setSampleData( instrument, sampleData );
+			modPlay3.setSampleLoop( instrument, 0, loopLength );
+			setInstrument( instrument );
+		}
 	}
 	
 	private void deletePattern( int pat )

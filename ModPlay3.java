@@ -341,6 +341,11 @@ public class ModPlay3
 		sampleLoopLength[ idx ] = ( loopLength & -2 ) * FIXED_POINT_ONE;
 	}
 	
+	public byte[] getSampleData( int idx )
+	{
+		return sampleData[ idx ];
+	}
+	
 	public void setSampleData( int idx, byte[] data )
 	{
 		sampleData[ idx ] = new byte[ ( data.length > 0x1FFFE ? 0x1FFFE : data.length ) & -2 ];
