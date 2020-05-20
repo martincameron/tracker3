@@ -261,6 +261,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	
 	private ModPlay3 modPlay3 = new ModPlay3( MAX_CHANNELS );
 	private int instrument, octave = 2, selectedFile, triggerChannel;
+	private byte[] copyBuf = new byte[ 0 ];
 	private boolean reverb;
 	
 	private static Color toColor( int rgb12 )
@@ -370,6 +371,12 @@ setNoteParam( 0, 0, 0, 0x40 );
 				octave = 4;
 				break;
 			case KeyEvent.VK_F5:
+				copy();
+				break;
+			case KeyEvent.VK_F6:
+				paste();
+				break;
+			case KeyEvent.VK_F7:
 				reverb = !reverb;
 				break;
 			case KeyEvent.VK_F8:
@@ -1975,6 +1982,48 @@ setNoteParam( 0, 0, 0, 0x40 );
 		}
 		gadText[ GADNUM_PLAY_BUTTON ][ 0 ] = "Play";
 		gadRedraw[ GADNUM_PLAY_BUTTON ] = true;
+	}
+	
+	private void copy()
+	{
+		int patt = ( gadItem[ GADNUM_PATTERN ] >> 24 ) & 0xFF;
+		int chan = ( gadItem[ GADNUM_PATTERN ] >> 16 ) & 0xFF;
+		int row1 = ( gadItem[ GADNUM_PATTERN ] >> 10 ) & 0x3F;
+		int row2 = ( gadItem[ GADNUM_PATTERN ] >> 4 ) & 0x3F;
+		if( chan > 0 && patt == modPlay3.getPattern( modPlay3.getSequencePos() ) )
+		{
+			byte[] patternData = modPlay3.getPatternData();
+			int offset = getNoteOffset( patt, row2 > row1 ? row1 : row2, chan - 1 );
+			int count = ( row2 > row1 ? row2 - row1 : row1 - row2 ) + 1;
+			copyBuf = new byte[ count * 4 ];
+			for( int idx = 0; idx < count; idx++ )
+			{
+				System.arraycopy( patternData, offset + idx * MAX_CHANNELS * 4, copyBuf, idx * 4, 4 );
+			}
+		}
+	}
+	
+	private void paste()
+	{
+		int patt = ( gadItem[ GADNUM_PATTERN ] >> 24 ) & 0xFF;
+		int chan = ( gadItem[ GADNUM_PATTERN ] >> 16 ) & 0xFF;
+		int row1 = ( gadItem[ GADNUM_PATTERN ] >> 10 ) & 0x3F;
+		int row2 = ( gadItem[ GADNUM_PATTERN ] >> 4 ) & 0x3F;
+		if( chan > 0 && row1 == row2 && patt == modPlay3.getPattern( modPlay3.getSequencePos() ) )
+		{
+			byte[] patternData = modPlay3.getPatternData();
+			int offset = getNoteOffset( patt, row1, chan - 1 );
+			int count = copyBuf.length / 4;
+			if( count > 64 - row1 )
+			{
+				count = 64 - row1;
+			}
+			for( int idx = 0; idx < count; idx++ )
+			{
+				System.arraycopy( copyBuf, idx * 4, patternData, offset + idx * MAX_CHANNELS * 4, 4 );
+			}
+			gadRedraw[ GADNUM_PATTERN ] = true;
+		}
 	}
 	
 	private void setNumChannels( int numChannels )
