@@ -329,7 +329,6 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		addKeyListener( this );
 		addMouseListener( this );
 		addMouseMotionListener( this );
-
 		createPattern( GADNUM_PATTERN, 4, 192, GADNUM_PATTERN_SLIDER );
 		createSlider( GADNUM_PATTERN_SLIDER, 616, 192, 20, 256, 15, 78 );
 		createDiskGadgets( 4, 4 );
@@ -339,19 +338,11 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		createSequenceGadgets( 540, 4 );
 		createLabel( GADNUM_VER_LABEL, 200, 6 + 7 * 16 + 50, VERSION, TEXT_HIGHLIGHT_SELECTED );
 		createButton( GADNUM_PLAY_BUTTON, 540, 6 + 7 * 16 + 46, 96, 24, "Play" );
-
-		getDir( null );
-		setInstrument( 1 );
-		
-		modPlay3.setSequencer( false );
-
-		gadRedraw[ 0 ] = true;
-
 		modPlay3.setPatternData( new byte[ MAX_CHANNELS * 4 * 64 * 128 ], MAX_CHANNELS );
-setNoteKey( 0, 0, 0, 0x01 );
-setNoteInstrument( 0, 0, 0, 0x1F );
-setNoteEffect( 0, 0, 0, 0x0C );
-setNoteParam( 0, 0, 0, 0x40 );
+		modPlay3.setSequencer( false );
+		setInstrument( 1 );
+		listDir( getDir() );
+		gadRedraw[ 0 ] = true;
 	}
 	
 	public synchronized void keyPressed( KeyEvent e )
@@ -1638,7 +1629,7 @@ setNoteParam( 0, 0, 0, 0x40 );
 				case GADNUM_DIR_TEXTBOX:
 					selectedFile = 0;
 				case GADNUM_DIR_BUTTON:
-					getDir( new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] ) );
+					listDir( getDir() );
 					gadItem[ GADNUM_DIR_LISTBOX ] = selectedFile;
 					gadValue[ GADNUM_DIR_SLIDER ] = selectedFile - 3;
 					break;
@@ -1657,7 +1648,7 @@ setNoteParam( 0, 0, 0, 0x40 );
 							if( file.isDirectory() )
 							{
 								selectedFile = 0;
-								getDir( file );
+								listDir( file );
 							}
 							else
 							{
@@ -1668,7 +1659,7 @@ setNoteParam( 0, 0, 0, 0x40 );
 						else
 						{
 							selectedFile = 0;
-							getDir( file.getParentFile() );
+							listDir( file.getParentFile() );
 						}
 					}
 					break;
@@ -1805,12 +1796,18 @@ setNoteParam( 0, 0, 0, 0x40 );
 		return names != null ? names : getFileNames( files, new String[ len ] );
 	}
 	
-	private void getDir( File file )
+	private File getDir()
 	{
-		if( file == null || !file.isDirectory() )
+		File file = new File( gadText[ GADNUM_DIR_TEXTBOX ][ 0 ] );
+		if( !file.isDirectory() )
 		{
 			file = new File( System.getProperty( "user.home" ) );
 		}
+		return file;
+	}
+	
+	private void listDir( File file )
+	{
 		File[] files = file.listFiles();
 		Arrays.sort( files );
 		String[] names = getFileNames( files, null );
@@ -2357,7 +2354,8 @@ setNoteParam( 0, 0, 0, 0x40 );
 	
 	private void save() throws IOException
 	{
-		FileOutputStream outputStream = new FileOutputStream( "out.mod" );
+		File file = new File( getDir(), ( System.currentTimeMillis() / 1000 ) + ".mod" );
+		FileOutputStream outputStream = new FileOutputStream( file );
 		try
 		{
 			modPlay3.writeModule( outputStream );
@@ -2366,6 +2364,7 @@ setNoteParam( 0, 0, 0, 0x40 );
 		{
 			outputStream.close();
 		}
+		listDir( getDir() );
 	}
 	
 	private synchronized int getAudio( int sampleRate, int[] output )
