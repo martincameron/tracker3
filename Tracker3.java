@@ -347,64 +347,75 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	
 	public synchronized void keyPressed( KeyEvent e )
 	{
-		switch( e.getKeyCode() )
+		try
 		{
-			case KeyEvent.VK_F1:
-				octave = 1;
-				break;
-			case KeyEvent.VK_F2:
-				octave = 2;
-				break;
-			case KeyEvent.VK_F3:
-				octave = 3;
-				break;
-			case KeyEvent.VK_F4:
-				octave = 4;
-				break;
-			case KeyEvent.VK_F5:
-				copy();
-				break;
-			case KeyEvent.VK_F6:
-				paste();
-				break;
-			case KeyEvent.VK_F7:
-				reverb = !reverb;
-				break;
-			case KeyEvent.VK_F8:
-				setNumChannels( modPlay3.getNumChannels() < MAX_CHANNELS ? MAX_CHANNELS : 4 );
-				break;
-			case KeyEvent.VK_F9:
-				if( e.isShiftDown() )
-				{
-					cropInstrument();
-				}
-				break;
-			case KeyEvent.VK_F10:
-				if( e.isShiftDown() )
-				{
-					optimize();
-				}
-				break;
-			default:
-				switch( gadType[ focus ] )
-				{
-					case GAD_TYPE_TEXTBOX:
-						keyTextbox( focus, e.getKeyChar(), e.getKeyCode() );
-						break;
-					case GAD_TYPE_LISTBOX:
-						keyListbox( focus, e.getKeyChar(), e.getKeyCode() );
-						trigger( -1, mapEventKey( KEY_MAP, e.getKeyCode() ) );
-						break;
-					case GAD_TYPE_PATTERN:
-						keyPattern( focus, e.getKeyChar(), e.getKeyCode(), e.isShiftDown() );
-						break;
-					default:
-						trigger( -1, mapEventKey( KEY_MAP, e.getKeyCode() ) );
-						break;
-				}
-				break;
+			switch( e.getKeyCode() )
+			{
+				case KeyEvent.VK_F1:
+					octave = 1;
+					break;
+				case KeyEvent.VK_F2:
+					octave = 2;
+					break;
+				case KeyEvent.VK_F3:
+					octave = 3;
+					break;
+				case KeyEvent.VK_F4:
+					octave = 4;
+					break;
+				case KeyEvent.VK_F5:
+					copy();
+					break;
+				case KeyEvent.VK_F6:
+					paste();
+					break;
+				case KeyEvent.VK_F7:
+					reverb = !reverb;
+					break;
+				case KeyEvent.VK_F8:
+					setNumChannels( modPlay3.getNumChannels() < MAX_CHANNELS ? MAX_CHANNELS : 4 );
+					break;
+				case KeyEvent.VK_F9:
+					if( e.isShiftDown() )
+					{
+						cropInstrument();
+					}
+					else
+					{
+						saveInstrument();
+					}
+					break;
+				case KeyEvent.VK_F10:
+					if( e.isShiftDown() )
+					{
+						optimize();
+					}
+					break;
+				default:
+					switch( gadType[ focus ] )
+					{
+						case GAD_TYPE_TEXTBOX:
+							keyTextbox( focus, e.getKeyChar(), e.getKeyCode() );
+							break;
+						case GAD_TYPE_LISTBOX:
+							keyListbox( focus, e.getKeyChar(), e.getKeyCode() );
+							trigger( -1, mapEventKey( KEY_MAP, e.getKeyCode() ) );
+							break;
+						case GAD_TYPE_PATTERN:
+							keyPattern( focus, e.getKeyChar(), e.getKeyCode(), e.isShiftDown() );
+							break;
+						default:
+							trigger( -1, mapEventKey( KEY_MAP, e.getKeyCode() ) );
+							break;
+					}
+					break;
+			}
+			repaint();
 		}
-		repaint();
+		catch( Exception x )
+		{
+			x.printStackTrace();
+		}
 	}
 	
 	public synchronized void keyReleased( KeyEvent e )
@@ -1664,7 +1675,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 					}
 					break;
 				case GADNUM_SAVE_BUTTON:
-					save();
+					saveModule();
 					break;
 				case GADNUM_TITLE_TEXTBOX:
 					modPlay3.setSongName( gadText[ gadnum ][ 0 ] );
@@ -2038,14 +2049,11 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	{
 		int loopStart = modPlay3.getSampleLoopStart( instrument );
 		int loopLength = modPlay3.getSampleLoopLength( instrument );
-		if( loopLength > 0 )
-		{
-			byte[] sampleData = new byte[ loopLength ];
-			System.arraycopy( modPlay3.getSampleData( instrument ), loopStart, sampleData, 0, loopLength );
-			modPlay3.setSampleData( instrument, sampleData );
-			modPlay3.setSampleLoop( instrument, 0, loopLength );
-			setInstrument( instrument );
-		}
+		byte[] sampleData = new byte[ loopLength ];
+		System.arraycopy( modPlay3.getSampleData( instrument ), loopStart, sampleData, 0, loopLength );
+		modPlay3.setSampleData( instrument, sampleData );
+		modPlay3.setSampleLoop( instrument, 0, loopLength );
+		setInstrument( instrument );
 	}
 	
 	private void deletePattern( int pat )
@@ -2352,9 +2360,45 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		stop();
 	}
 	
-	private void save() throws IOException
+	private static String toFileName( String name )
 	{
-		File file = new File( getDir(), ( System.currentTimeMillis() / 1000 ) + ".mod" );
+		int len = 0;
+		char[] chars = name.toCharArray();
+		for( int idx = 0; idx < chars.length; idx++ )
+		{
+			char chr = chars[ idx ];
+			if( ( chr >= '0' && chr <= '9' ) || ( chr >= 'A' && chr <= 'Z' ) || ( chr >= 'a' && chr <= 'z' ) )
+			{
+				chars[ len++ ] = chr;
+			}
+			else if( len > 0 && chars[ len - 1 ] > 32 )
+			{
+				chars[ len++ ] = 32;
+			}
+		}
+		return new String( chars, 0, len < 1 || chars[ len - 1 ] > 32 ? len : len - 1 );
+	}
+	
+	private static String getTimestamp( int length )
+	{
+		char[] chars = new char[ length ];
+		long time = System.currentTimeMillis() / 2000;
+		for( int idx = length - 1; idx >= 0; idx-- )
+		{
+			chars[ idx ] = HEX_TO_STR.charAt( ( int ) time & 0xF );
+			time = time >> 4;
+		}
+		return new String( chars );
+	}
+	
+	private void saveModule() throws IOException
+	{
+		String name = toFileName( modPlay3.getSongName() );
+		File file = new File( getDir(), name + ".mod" );
+		if( file.exists() )
+		{
+			file = new File( getDir(), name + '_' + getTimestamp( 6 ) + ".mod" );
+		}
 		FileOutputStream outputStream = new FileOutputStream( file );
 		try
 		{
@@ -2365,6 +2409,30 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 			outputStream.close();
 		}
 		listDir( getDir() );
+	}
+	
+	private void saveInstrument() throws IOException
+	{
+		byte[] data = modPlay3.getSampleData( instrument );
+		if( data.length > 0 )
+		{
+			String num = ( instrument < 10 ? "0" : "" ) + instrument;
+			String name = num + '_' + toFileName( modPlay3.getInstrumentName( instrument ) );
+			File file = new File( getDir(), name + ".raw" );
+			if( !file.exists() )
+			{
+				FileOutputStream outputStream = new FileOutputStream( file );
+				try
+				{
+					outputStream.write( data );
+				}
+				finally
+				{
+					outputStream.close();
+				}
+				listDir( getDir() );
+			}
+		}
 	}
 	
 	private synchronized int getAudio( int sampleRate, int[] output )

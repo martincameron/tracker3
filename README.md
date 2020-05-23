@@ -15,6 +15,7 @@ Other functions can be accessed using the function keys:
 * F6: Paste selection.
 * F7: Toggle simple reverb effect.
 * F8: Toggle 4 and 8 channels.
+* F9: Save current instrument as raw sample.
 * Shift + F9: Crop current instrument to loop points.
 * Shift + F10: Delete all unused patterns and instruments.
 
