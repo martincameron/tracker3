@@ -263,6 +263,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	private int instrument, octave = 2, selectedFile, triggerChannel;
 	private byte[] copyBuf = new byte[ 0 ];
 	private boolean reverb;
+	private String error;
 	
 	private static Color toColor( int rgb12 )
 	{
@@ -410,12 +411,13 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 					}
 					break;
 			}
-			repaint();
 		}
 		catch( Exception x )
 		{
 			x.printStackTrace();
+			setError( x.getMessage() );
 		}
+		repaint();
 	}
 	
 	public synchronized void keyReleased( KeyEvent e )
@@ -695,6 +697,12 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		BufferedImage image = new BufferedImage( w, h, BufferedImage.TYPE_INT_RGB );
 		image.setRGB( 0, 0, w, h, pixels, 0, w );
 		return image;
+	}
+	
+	private void setError( String message )
+	{
+		error = message;
+		gadRedraw[ GADNUM_PATTERN ] = true;
 	}
 	
 	private void drawText( Graphics g, int x, int y, String text, int colour )
@@ -1242,7 +1250,12 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		for( int r = 1; r < 16; r++ )
 		{
 			int dr = gadValue[ gadnum ] - 8 + r;
-			if( dr < 0 || dr > 63 )
+			if( r == 15 && error != null )
+			{
+				String msg = error.length() > 9 * MAX_CHANNELS ? error.substring( 0, 9 * MAX_CHANNELS ) : error;
+				drawText( g, x, y + r * 16, "*** " + ModPlay3.pad( error, ' ', 9 * MAX_CHANNELS, false ), TEXT_RED );
+			}
+			else if( dr < 0 || dr > 63 )
 			{
 				g.setColor( Color.BLACK );
 				g.fillRect( x, y + r * 16, ( 4 + 9 * 8 ) * 8, 16 );
@@ -1752,6 +1765,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		catch( Exception e )
 		{
 			e.printStackTrace();
+			setError( e.getMessage() );
 		}
 	}
 	
@@ -1975,6 +1989,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	
 	private void play()
 	{
+		error = null;
 		modPlay3.setSequencer( true );
 		modPlay3.seek( getSeqPos(), gadValue[ GADNUM_PATTERN ], SAMPLING_RATE );
 		gadText[ GADNUM_PLAY_BUTTON ][ 0 ] = "Stop";
@@ -2399,16 +2414,23 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		{
 			file = new File( getDir(), name + '_' + getTimestamp( 6 ) + ".mod" );
 		}
-		FileOutputStream outputStream = new FileOutputStream( file );
-		try
+		if( file.exists() )
 		{
-			modPlay3.writeModule( outputStream );
+			throw new IOException( "File already exists!" );
 		}
-		finally
+		else
 		{
-			outputStream.close();
+			FileOutputStream outputStream = new FileOutputStream( file );
+			try
+			{
+				modPlay3.writeModule( outputStream );
+			}
+			finally
+			{
+				outputStream.close();
+			}
+			listDir( getDir() );
 		}
-		listDir( getDir() );
 	}
 	
 	private void saveInstrument() throws IOException
@@ -2417,9 +2439,13 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		if( data.length > 0 )
 		{
 			String num = ( instrument < 10 ? "0" : "" ) + instrument;
-			String name = num + '_' + toFileName( modPlay3.getInstrumentName( instrument ) );
-			File file = new File( getDir(), name + ".raw" );
-			if( !file.exists() )
+			String name = toFileName( modPlay3.getInstrumentName( instrument ) );
+			File file = new File( getDir(), num + ( name.length() > 0 ? "_" + name : "" ) + ".raw" );
+			if( file.exists() )
+			{
+				throw new IOException( "File already exists!" );
+			}
+			else
 			{
 				FileOutputStream outputStream = new FileOutputStream( file );
 				try
