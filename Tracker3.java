@@ -368,7 +368,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 					copy();
 					break;
 				case KeyEvent.VK_F6:
-					paste();
+					paste( 0 );
 					break;
 				case KeyEvent.VK_F7:
 					reverb = !reverb;
@@ -1525,8 +1525,15 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 							int noteKey = mapEventKey( KEY_MAP, key );
 							if( noteKey > 0 )
 							{
-								setNoteKey( pat, row2, chn - 1, noteKey + octave * 12 );
-								setNoteInstrument( pat, row2, chn - 1, instrument );
+								if( shift )
+								{
+									paste( noteKey + octave * 12 - 25 );
+								}
+								else
+								{
+									setNoteKey( pat, row2, chn - 1, noteKey + octave * 12 );
+									setNoteInstrument( pat, row2, chn - 1, instrument );
+								}
 							}
 							trigger( chn - 1, noteKey );
 						}
@@ -2026,7 +2033,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		}
 	}
 	
-	private void paste()
+	private void paste( int transpose )
 	{
 		int patt = ( gadItem[ GADNUM_PATTERN ] >> 24 ) & 0xFF;
 		int chan = ( gadItem[ GADNUM_PATTERN ] >> 16 ) & 0xFF;
@@ -2043,7 +2050,22 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 			}
 			for( int idx = 0; idx < count; idx++ )
 			{
-				System.arraycopy( copyBuf, idx * 4, patternData, offset + idx * MAX_CHANNELS * 4, 4 );
+				System.arraycopy( copyBuf, idx * 4, patternData, offset, 4 );
+				int key = patternData[ offset ] & 0xFF;
+				if( key > 0 )
+				{
+					key += transpose;
+					while( key < 1 )
+					{
+						key += 12;
+					}
+					while( key > 72 )
+					{
+						key -= 12;
+					}
+					patternData[ offset ] = ( byte ) key;
+				}
+				offset += MAX_CHANNELS * 4;
 			}
 			gadRedraw[ GADNUM_PATTERN ] = true;
 		}
