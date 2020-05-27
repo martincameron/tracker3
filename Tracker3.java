@@ -466,7 +466,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 				clickListbox( clicked );
 				break;
 			case GAD_TYPE_PATTERN:
-				clickPattern( clicked );
+				clickPattern( clicked, e.isShiftDown() );
 				break;
 			default:
 				if( clicked > 0 )
@@ -1217,19 +1217,54 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		return new String( chars );
 	}
 	
+	private int getSelectedPattern()
+	{
+		return ( gadItem[ GADNUM_PATTERN ] >> 24 ) & 0xFF;
+	}
+	
+	private int getSelectedChannel()
+	{
+		return ( ( gadItem[ GADNUM_PATTERN ] >> 16 ) & 0xFF ) - 1;
+	}
+	
+	private int getSelectedRow1()
+	{
+		return ( gadItem[ GADNUM_PATTERN ] >> 10 ) & 0x3F;
+	}
+	
+	private int getSelectedRow2()
+	{
+		return ( gadItem[ GADNUM_PATTERN ] >> 4 ) & 0x3F;
+	}
+	
+	private int getSelectedColumn()
+	{
+		return gadItem[ GADNUM_PATTERN ] & 0xF;
+	}
+	
+	private void setSelection( int pat, int chn, int row1, int row2, int col )
+	{
+		gadItem[ GADNUM_PATTERN ] = ( pat << 24 ) | ( ( chn + 1 ) << 16 ) | ( row1 << 10 ) | ( row2 << 4 ) | col;
+	}
+	
+	private int getCurrentPattern()
+	{
+		return modPlay3.getPattern( modPlay3.getSequencePos() );
+	}
+	
 	private void drawPattern( Graphics g, int gadnum )
 	{
 		int numChannels = modPlay3.getNumChannels();
 		byte[] patternData = modPlay3.getPatternData();
-		int pat = modPlay3.getPattern( modPlay3.getSequencePos() );
+		int pat = getCurrentPattern();
 		int mute = modPlay3.getMute();
 		int x = gadX[ gadnum ];
 		int y = gadY[ gadnum ];
-		int selPat = ( gadItem[ gadnum ] >> 24 ) & 0xFF;
-		int selChan = ( gadItem[ gadnum ] >> 16 ) & 0xFF;
-		int selRow1 = ( gadItem[ gadnum ] >> 10 ) & 0x3F;
-		int selRow2 = ( gadItem[ gadnum ] >> 4 ) & 0x3F;
-		int selCol = gadItem[ gadnum ] & 0xF;
+		int selPat = getSelectedPattern();
+		int selChan = getSelectedChannel();
+		int selRow1 = getSelectedRow1();
+		int selRow2 = getSelectedRow2();
+		int selCol = getSelectedColumn();
 		if( gadLink[ gadnum ] > 0 )
 		{
 			gadValue[ gadnum ] = gadValue[ gadLink[ gadnum ] ];
@@ -1296,7 +1331,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 						drawText( g, x + ( c * 9 + 9 ) * 8, y + r * 16, note.substring( 5, 8 ), clr + hl );
 						drawText( g, x + ( c * 9 + 12 ) * 8, y + r * 16, " ", clr + hl );
 					}
-					if( selPat == pat && selChan == c + 1 && ( ( dr >= selRow1 && dr <= selRow2 ) || ( dr >= selRow2 && dr <= selRow1 ) ) )
+					if( selPat == pat && selChan == c && ( ( dr >= selRow1 && dr <= selRow2 ) || ( dr >= selRow2 && dr <= selRow1 ) ) )
 					{
 						int bx = c * 9 + 4;
 						int bw = 8;
@@ -1327,23 +1362,30 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		}
 	}
 	
-	private void clickPattern( int gadnum )
+	private void clickPattern( int gadnum, boolean shift )
 	{
-		gadItem[ gadnum ] = 0;
-		int row = ( clickY - gadY[ gadnum ] ) / 16;
-		int col = ( clickX - gadX[ gadnum ] ) / 8;
-		int chn = ( col - 4 ) / 9;
-		int selRow = gadValue[ gadnum ] + row - 8;
-		if( row > 0 && col > 3 && selRow >= 0 && selRow < 64 && chn < modPlay3.getNumChannels() && !modPlay3.getSequencer() )
+		int dspRow = ( clickY - gadY[ gadnum ] ) / 16;
+		int dspCol = ( clickX - gadX[ gadnum ] ) / 8;
+		int chn = ( dspCol - 4 ) / 9;
+		int row = gadValue[ gadnum ] + dspRow - 8;
+		if( dspRow > 0 && dspCol > 3 && row >= 0 && row < 64 && chn < modPlay3.getNumChannels() && !modPlay3.getSequencer() )
 		{
-			int pat = modPlay3.getPattern( modPlay3.getSequencePos() );
-			gadItem[ gadnum ] = ( pat << 24 ) | ( ( chn + 1 ) << 16 ) | ( selRow << 10 ) | ( selRow << 4 ) | ( col - chn * 9 - 4 );
+			int pat = getCurrentPattern();
+			if( shift && getSelectedPattern() == pat )
+			{
+				setSelection( pat, chn, getSelectedRow1(), row, 0 );
+			}
+			else
+			{
+				setSelection( pat, chn, row, row, dspCol - chn * 9 - 4 );
+			}
 		}
 		else
 		{
+			setSelection( 0, -1, 0, 0, 0 );
 			int mask = 1 << chn;
 			int mute = modPlay3.getMute();
-			if( mute == ~mask || col < 4 || chn >= modPlay3.getNumChannels() )
+			if( mute == ~mask || dspCol < 4 || chn >= modPlay3.getNumChannels() )
 			{
 				/* Solo channel, unmute all. */
 				mute = 0;
@@ -1406,12 +1448,12 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	
 	private void keyPattern( int gadnum, char chr, int key, boolean shift )
 	{
-		int pat = ( gadItem[ gadnum ] >> 24 ) & 0xFF;
-		int chn = ( gadItem[ gadnum ] >> 16 ) & 0xFF;
-		int row1 = ( gadItem[ gadnum ] >> 10 ) & 0x3F;
-		int row2 = ( gadItem[ gadnum ] >> 4 ) & 0x3F;
-		int col = gadItem[ gadnum ] & 0xF;
-		if( chn > 0 && pat == modPlay3.getPattern( modPlay3.getSequencePos() ) )
+		int pat = getSelectedPattern();
+		int chn = getSelectedChannel();
+		int row1 = getSelectedRow1();
+		int row2 = getSelectedRow2();
+		int col = getSelectedColumn();
+		if( pat == getCurrentPattern() && chn >= 0 && chn < modPlay3.getNumChannels() )
 		{
 			switch( key )
 			{
@@ -1444,7 +1486,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 				case KEY_LEFT:
 					if( col == 0 || shift )
 					{
-						chn = chn > 1 ? chn - 1 : 1;
+						chn = chn > 0 ? chn - 1 : 0;
 						col = 7;
 					}
 					else if( col > 3 )
@@ -1459,7 +1501,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 				case KEY_RIGHT:
 					if( col > 6 || shift )
 					{
-						chn = chn < MAX_CHANNELS ? chn + 1 : MAX_CHANNELS;
+						chn = chn < MAX_CHANNELS - 1 ? chn + 1 : MAX_CHANNELS - 1;
 						col = 0;
 					}
 					else if( col > 2 )
@@ -1477,14 +1519,14 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 					{
 						if( col < 3 )
 						{
-							setNoteKey( pat, row, chn - 1, 0 );
+							setNoteKey( pat, row, chn, 0 );
 						}
 						if( col < 5 )
 						{
-							setNoteInstrument( pat, row, chn - 1, 0 );
+							setNoteInstrument( pat, row, chn, 0 );
 						}
-						setNoteEffect( pat, row, chn - 1, 0 );
-						setNoteParam( pat, row, chn - 1, 0 );
+						setNoteEffect( pat, row, chn, 0 );
+						setNoteParam( pat, row, chn, 0 );
 						row++;
 					}
 					break;
@@ -1496,27 +1538,27 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 							int hex = mapEventKey( HEX_MAP, key );
 							if( col == 3 && hex >= 0 && hex < 4 )
 							{
-								setNoteInstrument( pat, row2, chn - 1, hex * 10 );
+								setNoteInstrument( pat, row2, chn, hex * 10 );
 								col++;
 							}
 							else if( col == 4 && hex >= 0 && hex < 10 )
 							{
-								setNoteInstrument( pat, row2, chn - 1, getNoteInstrument( pat, row2, chn - 1 ) / 10 * 10 + hex );
+								setNoteInstrument( pat, row2, chn, getNoteInstrument( pat, row2, chn ) / 10 * 10 + hex );
 								col++;
 							}
 							else if( col == 5 && hex >= 0 )
 							{
-								setNoteEffect( pat, row2, chn - 1, hex );
+								setNoteEffect( pat, row2, chn, hex );
 								col++;
 							}
 							else if( col == 6 && hex >= 0 )
 							{
-								setNoteParam( pat, row2, chn - 1, hex << 4 );
+								setNoteParam( pat, row2, chn, hex << 4 );
 								col++;
 							}
 							else if( col == 7 && hex >= 0 )
 							{
-								setNoteParam( pat, row2, chn - 1, ( getNoteParam( pat, row2, chn - 1 ) & 0xF0 ) | hex );
+								setNoteParam( pat, row2, chn, ( getNoteParam( pat, row2, chn ) & 0xF0 ) | hex );
 								col--;
 							}
 						}
@@ -1531,11 +1573,11 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 								}
 								else
 								{
-									setNoteKey( pat, row2, chn - 1, noteKey + octave * 12 );
-									setNoteInstrument( pat, row2, chn - 1, instrument );
+									setNoteKey( pat, row2, chn, noteKey + octave * 12 );
+									setNoteInstrument( pat, row2, chn, instrument );
 								}
 							}
-							trigger( chn - 1, noteKey );
+							trigger( chn, noteKey );
 						}
 					}
 					break;
@@ -1548,7 +1590,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 			{
 				row1 = row2;
 			}
-			gadItem[ gadnum ] = ( pat << 24 ) | ( chn << 16 ) | ( row1 << 10 ) | ( row2 << 4 ) | col;
+			setSelection( pat, chn, row1, row2, col );
 			gadRedraw[ gadnum ] = true;
 		}
 		else
@@ -2016,14 +2058,14 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	
 	private void copy()
 	{
-		int patt = ( gadItem[ GADNUM_PATTERN ] >> 24 ) & 0xFF;
-		int chan = ( gadItem[ GADNUM_PATTERN ] >> 16 ) & 0xFF;
-		int row1 = ( gadItem[ GADNUM_PATTERN ] >> 10 ) & 0x3F;
-		int row2 = ( gadItem[ GADNUM_PATTERN ] >> 4 ) & 0x3F;
-		if( chan > 0 && patt == modPlay3.getPattern( modPlay3.getSequencePos() ) )
+		int patt = getSelectedPattern();
+		int chan = getSelectedChannel();
+		int row1 = getSelectedRow1();
+		int row2 = getSelectedRow2();
+		if( patt == getCurrentPattern() && chan >= 0 && chan < modPlay3.getNumChannels() )
 		{
 			byte[] patternData = modPlay3.getPatternData();
-			int offset = getNoteOffset( patt, row2 > row1 ? row1 : row2, chan - 1 );
+			int offset = getNoteOffset( patt, row2 > row1 ? row1 : row2, chan );
 			int count = ( row2 > row1 ? row2 - row1 : row1 - row2 ) + 1;
 			copyBuf = new byte[ count * 4 ];
 			for( int idx = 0; idx < count; idx++ )
@@ -2035,14 +2077,14 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	
 	private void paste( int transpose )
 	{
-		int patt = ( gadItem[ GADNUM_PATTERN ] >> 24 ) & 0xFF;
-		int chan = ( gadItem[ GADNUM_PATTERN ] >> 16 ) & 0xFF;
-		int row1 = ( gadItem[ GADNUM_PATTERN ] >> 10 ) & 0x3F;
-		int row2 = ( gadItem[ GADNUM_PATTERN ] >> 4 ) & 0x3F;
-		if( chan > 0 && row1 == row2 && patt == modPlay3.getPattern( modPlay3.getSequencePos() ) )
+		int patt = getSelectedPattern();
+		int chan = getSelectedChannel();
+		int row1 = getSelectedRow1();
+		int row2 = getSelectedRow2();
+		if( patt == getCurrentPattern() && chan >= 0 && chan < modPlay3.getNumChannels() && row1 == row2 )
 		{
 			byte[] patternData = modPlay3.getPatternData();
-			int offset = getNoteOffset( patt, row1, chan - 1 );
+			int offset = getNoteOffset( patt, row1, chan );
 			int count = copyBuf.length / 4;
 			if( count > 64 - row1 )
 			{
