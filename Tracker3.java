@@ -1745,15 +1745,16 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 					break;
 				case GADNUM_INST_INC_BUTTON:
 					setInstrument( instrument + 1 );
-					gadValue[ GADNUM_DIR_SLIDER ] = instrument - 4;
+					listInstruments();
 					break;
 				case GADNUM_INST_DEC_BUTTON:
 					setInstrument( instrument - 1 );
-					gadValue[ GADNUM_DIR_SLIDER ] = instrument - 4;
+					listInstruments();
 					break;
 				case GADNUM_INST_NAME_TEXTBOX:
 					modPlay3.setInstrumentName( instrument, gadText[ gadnum ][ 0 ] );
 					setInstrument( instrument );
+					listInstruments();
 					break;
 				case GADNUM_INST_REP_TEXTBOX:
 					int rep = parsePositiveInt( gadText[ gadnum ][ 0 ], 0x1FFFE );
@@ -2011,17 +2012,6 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 			idx = 31;
 		}
 		instrument = idx;
-		String[] names = new String[ 31 ];
-		for( int ins = 1; ins <= names.length; ins++ )
-		{
-			String name = ModPlay3.pad( modPlay3.getInstrumentName( ins ), ' ', 22, false );
-			String len = ModPlay3.pad( String.valueOf( modPlay3.getSampleLength( ins ) ), ' ', 6, true );
-			names[ ins - 1 ] = ModPlay3.pad( String.valueOf( ins ), '0', 2, true ) + ' ' + name + ' ' + len;
-		}
-		gadValues[ GADNUM_DIR_LISTBOX ] = new int[ names.length ];
-		gadItem[ GADNUM_DIR_LISTBOX ] = idx - 1;
-		gadText[ GADNUM_DIR_LISTBOX ] = names;
-		gadRedraw[ GADNUM_DIR_LISTBOX ] = true;
 		gadText[ GADNUM_INST_TEXTBOX ][ 0 ] = String.valueOf( instrument );
 		gadRedraw[ GADNUM_INST_TEXTBOX ] = true;
 		gadText[ GADNUM_INST_NAME_TEXTBOX ][ 0 ] = String.valueOf( modPlay3.getInstrumentName( idx ) );
@@ -2034,6 +2024,22 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		gadRedraw[ GADNUM_INST_LEN_TEXTBOX ] = true;
 		gadText[ GADNUM_INST_FINE_TEXTBOX ][ 0 ] = String.valueOf( modPlay3.getSampleFinetune( idx ) );
 		gadRedraw[ GADNUM_INST_FINE_TEXTBOX ] = true;
+	}
+	
+	private void listInstruments()
+	{
+		String[] names = new String[ 31 ];
+		for( int ins = 1; ins <= names.length; ins++ )
+		{
+			String name = ModPlay3.pad( modPlay3.getInstrumentName( ins ), ' ', 22, false );
+			String len = ModPlay3.pad( String.valueOf( modPlay3.getSampleLength( ins ) ), ' ', 6, true );
+			names[ ins - 1 ] = ModPlay3.pad( String.valueOf( ins ), '0', 2, true ) + ' ' + name + ' ' + len;
+		}
+		gadValues[ GADNUM_DIR_LISTBOX ] = new int[ names.length ];
+		gadItem[ GADNUM_DIR_LISTBOX ] = instrument - 1;
+		gadText[ GADNUM_DIR_LISTBOX ] = names;
+		gadValue[ GADNUM_DIR_SLIDER ] = instrument - 4;
+		gadRedraw[ GADNUM_DIR_LISTBOX ] = true;
 	}
 	
 	private void play()
@@ -2200,6 +2206,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 			}
 		}
 		setInstrument( 1 );
+		listInstruments();
 	}
 	
 	private void load( File file ) throws IOException
@@ -2398,6 +2405,8 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	{
 		modPlay3.setInstrumentName( instrument, instrumentName );
 		modPlay3.setSampleData( instrument, sampleData );
+		modPlay3.setSampleVolume( instrument, 64 );
+		setInstrument( instrument );
 		stop();
 	}
 	
@@ -2436,6 +2445,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		setSequence( sequence );
 		gadValue[ GADNUM_DIR_SLIDER ] = 0;
 		setInstrument( 1 );
+		listInstruments();
 		stop();
 	}
 	
