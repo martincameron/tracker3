@@ -3,6 +3,10 @@
 
 A simple music editor for 4 and 8 channel Protracker modules.
 
+Modules and samples can be loaded by pressing DIR and navigating to the file.
+
+Samples must have the file extension ".WAV" ".IFF" or ".RAW".
+
 Notes can be entered using a virtual piano keyboard (QWERTY layout).
 
 Selections can be made by holding shift with the cursor keys, home and end.

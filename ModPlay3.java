@@ -350,7 +350,7 @@ public class ModPlay3
 	{
 		sampleData[ idx ] = new byte[ ( data.length > 0x1FFFE ? 0x1FFFE : data.length ) & -2 ];
 		System.arraycopy( data, 0, sampleData[ idx ], 0, sampleData[ idx ].length );
-		setSampleLoop( idx, 0, 0 );
+		setSampleLoop( idx, sampleData[ idx ].length, 0 );
 	}
 	
 	public int getNumChannels()

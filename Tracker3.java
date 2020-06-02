@@ -2398,7 +2398,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 	{
 		modPlay3.setInstrumentName( instrument, instrumentName );
 		modPlay3.setSampleData( instrument, sampleData );
-		setInstrument( instrument );
+		stop();
 	}
 	
 	private void loadMod( File file ) throws IOException
