@@ -396,10 +396,10 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 					switch( gadType[ focus ] )
 					{
 						case GAD_TYPE_TEXTBOX:
-							keyTextbox( focus, e.getKeyChar(), e.getKeyCode() );
+							keyTextbox( focus, e.getKeyChar(), e.getKeyCode(), e.isShiftDown() );
 							break;
 						case GAD_TYPE_LISTBOX:
-							keyListbox( focus, e.getKeyChar(), e.getKeyCode() );
+							keyListbox( focus, e.getKeyChar(), e.getKeyCode(), e.isShiftDown()  );
 							trigger( -1, mapEventKey( KEY_MAP, e.getKeyCode() ) );
 							break;
 						case GAD_TYPE_PATTERN:
@@ -460,10 +460,10 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 				clickTextbox( clicked );
 				break;
 			case GAD_TYPE_SLIDER:
-				clickSlider( clicked );
+				clickSlider( clicked, e.isShiftDown() );
 				break;
 			case GAD_TYPE_LISTBOX:
-				clickListbox( clicked );
+				clickListbox( clicked, e.isShiftDown() );
 				break;
 			case GAD_TYPE_PATTERN:
 				clickPattern( clicked, e.isShiftDown() );
@@ -471,7 +471,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 			default:
 				if( clicked > 0 )
 				{
-					action( clicked );
+					action( clicked, e.isShiftDown() );
 				}
 		}
 		focus = clicked;
@@ -489,13 +489,13 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 					{
 						gadSelected[ focus ] = false;
 						gadRedraw[ focus ] = true;
-						action( focus );
+						action( focus, e.isShiftDown() );
 						focus = 0;
 						repaint();
 					}
 					break;
 				case GAD_TYPE_SLIDER:
-					action( focus );
+					action( focus, e.isShiftDown() );
 					focus = 0;
 					repaint();
 					break;
@@ -853,7 +853,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		gadRedraw[ gadnum ] = true;
 	}
 
-	private void keyTextbox( int gadnum, char chr, int key )
+	private void keyTextbox( int gadnum, char chr, int key, boolean shift )
 	{
 		int columns = ( gadWidth[ gadnum ] - 16 ) / 8;
 		String text = gadText[ gadnum ][ 0 ];
@@ -924,7 +924,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 			default:
 				if( chr == 10 )
 				{
-					action( gadnum );
+					action( gadnum, shift );
 					text = gadText[ gadnum ][ 0 ];
 					focus = 0;
 				}
@@ -962,7 +962,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		raiseBox( g, x + 2, y + d + 2, w - 4, s );
 	}
 	
-	private void clickSlider( int gadnum )
+	private void clickSlider( int gadnum, boolean shift )
 	{
 		int ss = ( gadHeight[ gadnum ] - 12 ) * gadRange[ gadnum ] / gadMax[ gadnum ] + 8;
 		int so = ( gadHeight[ gadnum ] - 12 ) * gadValue[ gadnum ] / gadMax[ gadnum ];
@@ -976,7 +976,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 			}
 			gadValue[ gadnum ] = sp;
 			gadRedraw[ gadLink[ gadnum ] > 0 ? gadLink[ gadnum ] : gadnum ] = true;
-			action( gadnum );
+			action( gadnum, shift );
 		}
 		else if( clickY > ( sy + ss ) )
 		{
@@ -987,7 +987,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 			}
 			gadValue[ gadnum ] = sp;
 			gadRedraw[ gadLink[ gadnum ] > 0 ? gadLink[ gadnum ] : gadnum ] = true;
-			action( gadnum );
+			action( gadnum, shift );
 		}
 	}
 	
@@ -1070,14 +1070,14 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		}
 	}
 	
-	private void clickListbox( int gadnum )
+	private void clickListbox( int gadnum, boolean shift )
 	{
 		int time = ( int ) System.currentTimeMillis();
 		int dt = time - gadRange[ gadnum ];
 		int item = gadValue[ gadnum ] + ( clickY - gadY[ gadnum ] - 6 ) / 16;
 		if( item == gadItem[ gadnum ] && dt > 0 && dt < 500 )
 		{
-			action( gadnum );
+			action( gadnum, shift );
 			gadRange[ gadnum ] = 0;
 		}
 		else
@@ -1091,7 +1091,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		}
 	}
 	
-	private void keyListbox( int gadnum, char chr, int key )
+	private void keyListbox( int gadnum, char chr, int key, boolean shift )
 	{
 		int item = gadItem[ gadnum ];
 		switch( key )
@@ -1124,7 +1124,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 			default:
 				if( chr == 10 )
 				{
-					action( gadnum );
+					action( gadnum, shift );
 				}
 				break;
 		}
@@ -1693,7 +1693,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		}
 	}
 	
-	private void action( int gadnum )
+	private void action( int gadnum, boolean shift )
 	{
 		try
 		{
@@ -1726,13 +1726,17 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 							else
 							{
 								selectedFile = gadItem[ GADNUM_DIR_LISTBOX ];
-								load( file );
+								load( file, shift );
 							}
 						}
 						else
 						{
-							selectedFile = 0;
-							listDir( file.getParentFile() );
+							file = file.getParentFile();
+							if( file != null )
+							{
+								selectedFile = 0;
+								listDir( file );
+							}
 						}
 					}
 					break;
@@ -1808,8 +1812,6 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 						play();
 					}
 					break;
-				default:
-					System.out.println( gadnum );
 			}
 		}
 		catch( Exception e )
@@ -2209,7 +2211,7 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		listInstruments();
 	}
 	
-	private void load( File file ) throws IOException
+	private void load( File file, boolean shift ) throws IOException
 	{
 		String extension = file.getName().toLowerCase();
 		if( extension.length() > 3 )
@@ -2220,13 +2222,16 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		{
 			loadWav( file, 0 );
 		}
-		else if( extension.equals( ".iff" ) )
+		else if( extension.equals( ".iff" ) || extension.equals( ".raw" ) || shift )
 		{
-			loadIff( file );
-		}
-		else if( extension.equals( ".raw" ) )
-		{
-			loadRaw( file );
+			try
+			{
+				loadIff( file );
+			}
+			catch( IllegalArgumentException e )
+			{
+				loadRaw( file );
+			}
 		}
 		else
 		{
