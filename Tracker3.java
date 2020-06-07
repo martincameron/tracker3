@@ -2222,7 +2222,8 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		{
 			loadWav( file, 0 );
 		}
-		else if( extension.equals( ".iff" ) || extension.equals( ".raw" ) || shift )
+		else if( extension.equals( ".iff" ) || extension.equals( ".sam" )
+			|| extension.equals( ".smp" ) || extension.equals( ".raw" ) || shift )
 		{
 			try
 			{
