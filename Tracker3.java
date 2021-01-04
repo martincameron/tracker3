@@ -1457,6 +1457,9 @@ public class Tracker3 extends Canvas implements KeyListener, MouseListener, Mous
 		{
 			switch( key )
 			{
+				case KEY_ESCAPE:
+					chn = -1;
+					break;
 				case KEY_HOME:
 					row2 = 0;
 					gadValue[ GADNUM_PATTERN_SLIDER ] = 0;
