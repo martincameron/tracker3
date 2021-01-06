@@ -3,6 +3,8 @@
 
 A simple music editor for 4 and 8 channel Protracker modules.
 
+![Screenshot](screenshot.png)
+
 Modules and samples can be loaded by pressing DIR and navigating to the file.
 
 Hold shift to load IFF-8SVX and signed 8-bit RAW samples with no file extension.
