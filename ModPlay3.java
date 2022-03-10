@@ -124,6 +124,12 @@ public class ModPlay3
 			sampleLoopStart[ idx ] = loopStart * FIXED_POINT_ONE;
 			sampleLoopLength[ idx ] = loopLength * FIXED_POINT_ONE;
 		}
+		for( int idx = numSamples; idx < MAX_SAMPLES; idx++ )
+		{
+			instrumentNames[ idx ] = "";
+			sampleVolume[ idx ] = 64;
+			sampleData[ idx ] = new byte[ 0 ];
+		}
 		songLength = moduleData.read() & 0x7F;
 		if( songLength < 1 )
 		{
@@ -192,7 +198,6 @@ public class ModPlay3
 			patternData[ idx + 2 ] = ( byte ) effect;
 			patternData[ idx + 3 ] = ( byte ) ( ( param1 << 4 ) | ( param2 & 0xF ) );
 		}
-		
 		for( int idx = 1; idx < numSamples; idx++ )
 		{
 			sampleData[ idx ] = readBytes( moduleData, sampleLengths[ idx ] );
